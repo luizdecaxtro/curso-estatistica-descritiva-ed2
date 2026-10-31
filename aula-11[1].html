@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 11 – Coeficiente de variação | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+
+.palpites{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.btn-sec.on-p{background:var(--laranja);color:#fff}
+.tipos-moda{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+.tipos-moda div{background:var(--fundo);border-top:3px solid var(--laranja);border-radius:4px;padding:14px;text-align:center}
+.tipos-moda b{display:block;color:var(--tinta);font-size:16px}
+.tipos-moda span{font-size:12px;color:var(--cinza)}
+@media (max-width:860px){.tipos-moda{grid-template-columns:1fr 1fr}}
+
+table.editavel input{width:70px;padding:6px 8px;font-size:15px;border:1px solid var(--linha);border-radius:4px;text-align:center;font-family:inherit}
+table.editavel input:focus{outline:2px solid var(--laranja);border-color:transparent}
+#tabDesv th{font-size:12px}
+#tabDesv td,#tabDesv th{padding:8px 6px}
+@media (max-width:860px){#tabDesv{font-size:13px}}
+
+.fila{position:relative;height:78px;margin:16px 0 8px;overflow:hidden}
+.ficha-f{position:absolute;left:0;top:20px;height:44px;display:grid;place-items:center;background:#fff;border:1px solid var(--linha);border-radius:6px;font-weight:700;color:var(--tinta);font-size:15px;transition:transform .7s cubic-bezier(.4,1.3,.5,1),background .3s,color .3s;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.ficha-f::before{content:attr(data-pos);position:absolute;top:-19px;font-size:11px;color:var(--cinza);font-weight:400}
+.ficha-f.centro{background:var(--verde);color:#fff;border-color:var(--verde)}
+.ficha-f.alterado{outline:2px dashed var(--laranja);outline-offset:2px}
+.treino-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza)}
+input.resp{width:120px;padding:10px 12px;font-size:16px;border:1px solid var(--linha);border-radius:6px;font-family:inherit}
+input.resp:focus{outline:2px solid var(--laranja);border-color:transparent}
+.dois-lados{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+.lado{border:1px solid var(--linha);border-radius:6px;padding:20px;background:#fff}
+.lado.on-lado{border:2px solid var(--laranja);background:var(--laranja-claro)}
+.lado p{font-size:16px;margin:0}
+.lado h3{margin:0 0 8px}
+.icone{font-size:34px;margin-bottom:6px}
+.passo2{display:none}.passo2.on{display:block;animation:surgir .4s}
+.passo2 h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo2 p{font-size:16px}
+@media (max-width:860px){.dois-lados{grid-template-columns:1fr}}
+
+table.freq tr.pisca2 td{background:#FFF4D6}
+.lado .rotulo{display:block}
+
+.rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:860px){.grafico.filaq{min-width:480px}}
+
+.dois-campos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.dois-campos label{font-size:13px;font-weight:700;color:var(--tinta);display:block;margin-bottom:6px}
+@media (max-width:860px){.dois-campos{grid-template-columns:1fr}}
+
+.quad{transform-box:fill-box;transform-origin:bottom center;animation:cresce .6s both}
+@keyframes cresce{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+.conversor{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:10px 0}
+.seta-c{font-size:13px;font-weight:700;color:var(--laranja);text-align:center}
+.lado h3{font-size:19px}
+@media (max-width:860px){.conversor{grid-template-columns:1fr}}
+
+.area-lado{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:center}
+@media (max-width:860px){.area-lado{grid-template-columns:1fr}}
+
+.cancela{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;background:#fff;border-radius:6px;padding:18px;margin:16px 0;font-size:18px;color:var(--tinta);box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.frac{display:inline-flex;flex-direction:column;align-items:center;font-size:18px}
+.frac span:first-child{border-bottom:2px solid var(--tinta);padding:0 6px 2px}
+.frac span:last-child{padding:2px 6px 0}
+.frac s{color:var(--vermelho);text-decoration-thickness:2px}
+.cancela .sep{color:var(--cinza)}
+table.editavel input.nome{width:150px;text-align:left}
+input.campo{width:100%;padding:9px 12px;font-size:15px;border:1px solid var(--linha);border-radius:5px;margin-bottom:6px;font-family:inherit}
+.bh{transform-box:fill-box;transform-origin:left center;animation:estica .6s both}
+@keyframes estica{from{transform:scaleX(0)}to{transform:none}}
+
+@media (max-width:860px){
+  table.editavel input.nome{width:96px}
+  table.editavel input{width:58px;padding:6px 4px;font-size:14px}
+  table.editavel th,table.editavel td{padding:8px 4px;font-size:13px}
+  .abas{flex-wrap:wrap}
+}
+</style>
+</head>
+<body data-aula="aula11">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 11 · Coeficiente de variação</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="feita"><span class="num">✓</span>Representando dados com gráficos</li>
+    <li class="feita"><span class="num">✓</span>Moda: o valor que mais se repete</li>
+    <li class="feita"><span class="num">✓</span>Média aritmética: o ponto de equilíbrio</li>
+    <li class="feita"><span class="num">✓</span>Mediana: o valor central</li>
+    <li class="feita"><span class="num">✓</span>Quartis, decis e percentis</li>
+    <li class="feita"><span class="num">✓</span>Amplitude e amplitude interquartil</li>
+    <li class="feita"><span class="num">✓</span>Variância</li>
+    <li class="feita"><span class="num">✓</span>Desvio padrão</li>
+    <li class="ativa"><span class="num">11</span>Coeficiente de variação</li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 11 de 12 · Quão espalhados estão os dados?</div>
+    <h2>Coeficiente de variação: comparando dispersões</h2>
+    <p style="color:#E4E7EB">Dispersão relativa e as suas condições de uso</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 11</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 11, a última do bloco sobre dispersão. Na lição anterior, o desvio padrão trouxe a dispersão de volta para a unidade dos dados. Isso é ótimo para interpretar uma única variável. Mas e quando queremos comparar duas variáveis diferentes?</p>
+<p class="narra">Imagine uma pediatra que mede recém-nascidos. O peso varia, em média, quatro décimos de quilo; o comprimento varia dois centímetros. Qual dos dois é mais variável? O dois parece maior que o zero vírgula quatro, mas essa comparação não diz nada: são quilos contra centímetros.</p>
+<p class="narra">A saída é relativizar. Dividimos cada desvio padrão pela sua média e expressamos o resultado em porcentagem. Essa medida é o coeficiente de variação. Como a unidade se cancela na divisão, ele permite comparar grandezas diferentes, ou conjuntos com médias muito distintas. E, no caso dos bebês, revela que o peso é bem mais variável que o comprimento.</p>
+<p class="narra">Mas o coeficiente de variação tem condições. A média precisa ser diferente de zero, e a variável precisa ter um zero absoluto. Você vai ver o que acontece quando essas condições falham: a mesma temperatura dá um coeficiente de vinte por cento em graus Celsius e de sete vírgula dois por cento em Fahrenheit. E o lucro de uma pequena empresa, com média perto de zero, produz um número enorme e sem sentido.</p>
+<p class="narra">Na aula, você vai comparar variáveis em unidades diferentes, mexer nas escalas de temperatura, levar uma média até perto de zero, decidir quando o coeficiente pode ser usado e comparar a dispersão relativa dos seus próprios dados. Vamos começar?</p>
+      </div></details>
+    </div>
+    <div class="citacao">O coeficiente de variação expressa a dispersão em relação à média, em forma percentual, o que permite comparar a variabilidade de conjuntos medidos em unidades ou com médias diferentes.<small>TRIOLA, 2017</small></div>
+    <p>Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Calcular o coeficiente de variação</li>
+      <li><span class="n">2</span>Comparar a dispersão de variáveis em unidades diferentes</li>
+      <li><span class="n">3</span>Verificar as condições de uso do CV</li>
+      <li><span class="n">4</span>Reconhecer quando preferir o desvio padrão</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Quilos contra centímetros</h2>
+    <div class="abas">
+      <button class="on" data-aba="a1">Recém-nascidos</button>
+      <button data-aba="a2">Consumo de duas casas</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Uma pediatra mede recém-nascidos. Qual variável é mais variável?</p>
+      <div class="dois-lados">
+        <div class="lado"><span class="rotulo">Peso</span><h3>média 3,4 kg · s = 0,4 kg</h3><p id="rnPeso">Desvio padrão: 0,4 kg</p></div>
+        <div class="lado"><span class="rotulo">Comprimento</span><h3>média 50 cm · s = 2 cm</h3><p id="rnComp">Desvio padrão: 2 cm</p></div>
+      </div>
+      <p>O desvio padrão do comprimento é maior em número (2 contra 0,4), mas isso não diz nada: são unidades diferentes.</p>
+      <div class="controles"><button class="btn-sec" id="relativizar">Relativizar pela média</button></div>
+      <div id="rnGraf"></div>
+      <p id="rnMsg"></p>
+    </div>
+    <div class="painel" id="a2">
+      <p>A casa A consome, em média, <b>200 kWh</b> por mês, com desvio padrão de <b>20 kWh</b>. A casa B consome <b>600 kWh</b>, com desvio padrão de <b>60 kWh</b>.</p>
+      <div id="casasGraf"></div>
+      <p>A variação absoluta da casa B é três vezes maior, mas a média também é três vezes maior. Em termos relativos, as duas casas variam <b>exatamente o mesmo</b>: 20 / 200 = 10% e 60 / 600 = 10%.</p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2" data-trava="rel">Continuar</button><div class="dica-trava">Clique em “Relativizar pela média” para continuar</div></div>
+</section>
+
+<!-- 2. DEFINIÇÃO -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Definição</div>
+    <h2>CV = (s / x̄) · 100%</h2>
+    <div class="dois-lados">
+      <div class="lado on-lado"><span class="rotulo">Amostra</span><h3>CV = (s / x̄) · 100%</h3></div>
+      <div class="lado"><span class="rotulo">População</span><h3>CV = (σ / μ) · 100%</h3></div>
+    </div>
+    <div class="cancela">
+      <span class="frac"><span>0,4 <s>kg</s></span><span>3,4 <s>kg</s></span></span> <span>≈ 0,118 = <b>11,8%</b></span>
+      <span class="sep">·</span>
+      <span class="frac"><span>2 <s>cm</s></span><span>50 <s>cm</s></span></span> <span>= 0,04 = <b>4%</b></span>
+    </div>
+    <p>O CV mede o desvio padrão como fração da média, de modo que <b>a unidade se cancela</b>: ele é <b>adimensional</b>. Por isso, pode ser comparado entre quilogramas e centímetros, ou entre conjuntos com médias muito distintas.</p>
+    <table class="freq">
+      <tr><th>Variável</th><th>Média</th><th>Desvio padrão</th><th>CV</th></tr>
+      <tr><td style="text-align:left">Peso dos recém-nascidos (kg)</td><td>3,4</td><td>0,4</td><td>11,8%</td></tr>
+      <tr><td style="text-align:left">Comprimento dos recém-nascidos (cm)</td><td>50</td><td>2</td><td>4,0%</td></tr>
+      <tr><td style="text-align:left">Consumo mensal, casa A (kWh)</td><td>200</td><td>20</td><td>10,0%</td></tr>
+      <tr><td style="text-align:left">Consumo mensal, casa B (kWh)</td><td>600</td><td>60</td><td>10,0%</td></tr>
+    </table>
+    <p class="fonte">Tabela 7 – Média, desvio padrão e coeficiente de variação de quatro variáveis (dados fictícios). Fonte: elaboração do autor.</p>
+    <div class="acordeao">
+      <details><summary>E em dados agrupados?</summary><div class="corpo"><p>O procedimento é o mesmo: estimamos a média e o desvio padrão a partir das classes e calculamos a razão. O resultado é uma aproximação.</p></div></details>
+      <details><summary>O que é um CV “alto”?</summary><div class="corpo"><p>Não há uma classificação universal. Os critérios variam conforme a área de estudo e o tipo de variável. O CV deve ser interpretado no contexto e comparado com outros conjuntos da mesma natureza.</p></div></details>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3">Continuar</button></div>
+</section>
+
+<!-- 3. COMPARADOR -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Comparador</div>
+    <h2>Variabilidade absoluta × relativa</h2>
+    <p>Edite a média e o desvio padrão de duas variáveis. Os valores iniciais são os do Exercício 2 do livro (preços de dois produtos).</p>
+    <table class="freq editavel" id="tabComp"></table>
+    <div id="compGraf"></div>
+    <p id="compMsg"></p>
+    <div class="questao" data-q="prod">
+      <div class="enunciado">Produto A: média R$ 50, desvio R$ 5. Produto B: média R$ 200, desvio R$ 16. Qual tem maior variabilidade relativa?</div>
+      <button class="opcao"><span class="radio"></span>O produto B, porque o seu desvio padrão é maior</button>
+      <button class="opcao" data-certa><span class="radio"></span>O produto A (CV = 10%, contra 8% do B)</button>
+      <button class="opcao"><span class="radio"></span>Os dois variam igualmente</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. CV(A) = 5 / 50 = 10%; CV(B) = 16 / 200 = 8%. O desvio absoluto de B é maior (R$ 16 contra R$ 5), mas representa uma fração menor do seu preço médio." data-nao="Não é essa. O desvio absoluto de B é maior, mas o seu preço também é muito maior. Relativizando: CV(A) = 5 / 50 = 10% e CV(B) = 16 / 200 = 8%. A tem maior variabilidade relativa."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4" data-trava="prod">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 4. CONDIÇÕES -->
+<section class="secao" data-s="4">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Condições para o uso do CV</div>
+    <h2>Duas exigências: média ≠ 0 e zero absoluto</h2>
+    <div class="abas">
+      <button class="on" data-aba="c1">A escala importa</button>
+      <button data-aba="c2">Média perto de zero</button>
+    </div>
+    <div class="painel on" id="c1">
+      <p>A temperatura em graus Celsius tem escala <b>intervalar</b>: o zero da escala é arbitrário. Veja o que acontece ao converter a mesma temperatura para Fahrenheit (média: °F = °C × 1,8 + 32; desvio padrão: × 1,8).</p>
+      <div class="painel-calc">
+        <label for="tMed">Média: <b id="tMedV">10</b> °C</label>
+        <input type="range" id="tMed" min="1" max="35" value="10">
+        <label for="tDp">Desvio padrão: <b id="tDpV">2</b> °C</label>
+        <input type="range" id="tDp" min="0.5" max="8" step="0.5" value="2">
+        <div class="dois-lados">
+          <div class="lado"><span class="rotulo">Em Celsius</span><h3 id="tC">CV = 20%</h3><p id="tCtxt">2 / 10</p></div>
+          <div class="lado on-lado"><span class="rotulo">Em Fahrenheit</span><h3 id="tF">CV = 7,2%</h3><p id="tFtxt">3,6 / 50</p></div>
+        </div>
+        <p id="tMsg" style="margin-top:12px"></p>
+      </div>
+    </div>
+    <div class="painel" id="c2">
+      <p>O lucro mensal de uma pequena empresa tem desvio padrão de <b>R$ 4,00</b>. Mude a média e observe o CV.</p>
+      <div class="painel-calc">
+        <label for="lMed">Média do lucro: <b id="lMedV">R$ 1,00</b></label>
+        <input type="range" id="lMed" min="-4" max="20" step="0.5" value="1">
+        <div class="caixas">
+          <div class="caixa"><span>Desvio padrão</span><b>R$ 4,00</b></div>
+          <div class="caixa destaque-cx"><span>CV = s / x̄</span><b id="lCV">400%</b></div>
+        </div>
+        <p id="lMsg"></p>
+      </div>
+    </div>
+  </div></div>
+  <div class="bloco">
+    <div class="rotulo">Atividade</div>
+    <h3>O CV pode ser usado aqui?</h3>
+    <p class="fonte">Arraste cada situação, ou toque nela e depois na coluna.</p>
+    <div class="dd-banco" id="dd1Banco"></div>
+    <div class="dd-zonas" id="dd1Zonas" style="grid-template-columns:1fr 1fr">
+      <div class="dd-zona" data-z="s"><h4>✓ Pode usar o CV</h4></div>
+      <div class="dd-zona" data-z="n"><h4>✗ Prefira o desvio padrão</h4></div>
+    </div>
+    <div class="dd-msg" id="dd1Msg"></div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="5" data-trava="cond">Continuar</button><div class="dica-trava">Explore as duas abas e classifique todas as situações para continuar</div></div>
+</section>
+
+<!-- 5. LABORATÓRIO -->
+<section class="secao" data-s="5">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">Compare a dispersão relativa de dois conjuntos</h3>
+      <p>Digite os valores de dois conjuntos, mesmo que em unidades diferentes (vírgula para decimais; espaço ou ponto e vírgula para separar). A aula calcula média, desvio padrão amostral e CV de cada um e avisa se alguma condição não for atendida.</p>
+    </div>
+    <div class="dois-campos">
+      <div><label>Nome e unidade do conjunto 1</label><input type="text" id="n1" class="campo" placeholder="Ex.: Peso (kg)"><textarea id="lab1" rows="2" placeholder="Valores do conjunto 1"></textarea></div>
+      <div><label>Nome e unidade do conjunto 2</label><input type="text" id="n2" class="campo" placeholder="Ex.: Altura (cm)"><textarea id="lab2" rows="2" placeholder="Valores do conjunto 2"></textarea></div>
+    </div>
+    <div class="erro-txt" id="labErro"></div>
+    <div class="controles">
+      <button class="btn-sec" id="labGerar">Comparar</button>
+      <button class="btn-sec" id="labEx">Exemplo: padaria, Semanas 1 e 2</button>
+    </div>
+    <div id="labTab"></div>
+    <div id="labGraf"></div>
+    <div id="labMsg"></div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="6">Continuar</button></div>
+</section>
+
+<!-- 6. RESUMO -->
+<section class="secao" data-s="6">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="cartoes quatro">
+      <button class="cartao"><div class="giro"><div class="face frente">O que é<small>Clique para virar</small></div><div class="face verso">A razão entre o desvio padrão e a média, em porcentagem.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Para que serve<small>Clique para virar</small></div><div class="face verso">Por ser adimensional, compara a dispersão de variáveis em unidades diferentes ou com médias distintas.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Condições<small>Clique para virar</small></div><div class="face verso">Média diferente de zero e variável em escala de razão, com zero absoluto.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Quando evitar<small>Clique para virar</small></div><div class="face verso">Temperatura em Celsius, lucros com média perto de zero: use o desvio padrão na unidade original.</div></div></button>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="7">Ir para o quiz</button></div>
+</section>
+
+<!-- 7. QUIZ -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 11 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões baseadas nos exercícios do Capítulo 11.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=8, CHAVE="decastro-estat-l11", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+function curto(v){ if(Math.abs(v)<1e-9) v=0; var s=br(v,2); return s.replace(/,00$/,"").replace(/(,\d)0$/,"$1"); }
+function pct(v){ return br(v,1).replace(/,0$/,"")+"%"; }
+var LAR="#E4572E", CLARO="#F6B9A4", TINTA="#1F2933", VERDE="#2F9E6E", AZUL="#3E6FB0";
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao"));
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+var abasVistas={};
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(":scope > .painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); abasVistas[b.dataset.aba]=1; checaCond(); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* barras horizontais de CV */
+function barrasH(itens, o){
+  o=o||{}; var W=560, lh=46, H=itens.length*lh+30, x0=o.x0||200, x1=530, mx=o.max||Math.max.apply(null,itens.map(function(i){return i[1];}))*1.15||1;
+  function X(v){return x0+(x1-x0)*Math.max(0,v)/mx;}
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(o.aria||"Barras horizontais")+'">'];
+  itens.forEach(function(it,i){ var y=10+i*lh; s.push('<text x="'+(x0-10)+'" y="'+(y+22)+'" font-size="13" text-anchor="end" fill="'+TINTA+'">'+it[0]+'</text><rect class="bh" x="'+x0+'" y="'+(y+6)+'" width="'+(X(it[1])-x0)+'" height="26" rx="3" fill="'+(it[2]||LAR)+'"/><text x="'+(X(it[1])+8)+'" y="'+(y+24)+'" font-size="13" font-weight="700" fill="'+TINTA+'">'+(o.fmt?o.fmt(it[1]):pct(it[1]))+'</text>'); });
+  s.push('<line x1="'+x0+'" x2="'+x0+'" y1="6" y2="'+(H-22)+'" stroke="#9AA5B1"/>');
+  if(o.leg) s.push('<text x="'+((x0+x1)/2)+'" y="'+(H-4)+'" font-size="11" text-anchor="middle" fill="#7B8794">'+o.leg+'</text>');
+  return s.join("")+'</svg>';
+}
+
+/* exemplo 1 */
+var relat=false;
+function rn(){ document.getElementById("rnGraf").innerHTML = relat ? barrasH([["Peso (kg)",0.4/3.4*100],["Comprimento (cm)",4,AZUL]],{max:14,leg:"Figura 12 – CV do peso e do comprimento (dados fictícios)",aria:"CV do peso e do comprimento"}) : barrasH([["Peso: s em kg",0.4],["Comprimento: s em cm",2,AZUL]],{max:2.4,fmt:function(v){return curto(v)+(v<1?" kg":" cm");},leg:"desvios padrão em unidades diferentes: comparação sem sentido",aria:"Desvios padrão em unidades diferentes"});
+  document.getElementById("rnMsg").innerHTML = relat ? "Peso: 0,4 / 3,4 ≈ <b>11,8%</b>. Comprimento: 2 / 50 = <b>4%</b>. Em termos relativos, <b>o peso é bem mais variável que o comprimento</b>." : "";
+  if(relat){ document.getElementById("rnPeso").innerHTML="CV = 0,4 / 3,4 ≈ <b>11,8%</b>"; document.getElementById("rnComp").innerHTML="CV = 2 / 50 = <b>4%</b>"; liberar("rel"); } }
+document.getElementById("relativizar").addEventListener("click", function(){ relat=true; rn(); });
+rn();
+document.getElementById("casasGraf").innerHTML=barrasH([["Casa A: s (kWh)",20],["Casa B: s (kWh)",60,AZUL]],{max:70,x0:170,fmt:function(v){return v+" kWh";},aria:"Desvios padrão absolutos"})+barrasH([["Casa A: CV",10],["Casa B: CV",10,AZUL]],{max:14,x0:170,aria:"CV das duas casas"});
+
+/* comparador */
+var COMP=[["Produto A (R$)",50,5],["Produto B (R$)",200,16]];
+(function(){ var t=document.getElementById("tabComp");
+  t.innerHTML='<tr><th>Variável</th><th>Média</th><th>Desvio padrão</th><th>CV</th></tr>'+COMP.map(function(r,i){return '<tr><td><input type="text" value="'+r[0]+'" data-i="'+i+'" data-c="0" class="nome" aria-label="Nome"></td><td><input type="number" step="any" value="'+r[1]+'" data-i="'+i+'" data-c="1" aria-label="Média"></td><td><input type="number" step="any" min="0" value="'+r[2]+'" data-i="'+i+'" data-c="2" aria-label="Desvio padrão"></td><td class="cv"></td></tr>';}).join("");
+  t.querySelectorAll("input").forEach(function(inp){ inp.addEventListener("input", function(){ var c=+inp.dataset.c; COMP[+inp.dataset.i][c]= c===0 ? inp.value : parseFloat(inp.value); comparar(); }); });
+})();
+function comparar(){ var cvs=COMP.map(function(r){ return (isFinite(r[1])&&isFinite(r[2])&&r[1]!==0) ? r[2]/Math.abs(r[1])*100 : NaN; });
+  document.querySelectorAll("#tabComp .cv").forEach(function(c,i){ c.textContent=isFinite(cvs[i])?pct(cvs[i]):"—"; });
+  if(cvs.some(function(v){return !isFinite(v);})){ document.getElementById("compGraf").innerHTML=""; document.getElementById("compMsg").textContent="Com média igual a zero, o CV não está definido."; return; }
+  document.getElementById("compGraf").innerHTML=barrasH([[COMP[0][0]+": s",COMP[0][2]],[COMP[1][0]+": s",COMP[1][2],AZUL]],{x0:200,fmt:curto,aria:"Desvios padrão"})+barrasH([[COMP[0][0]+": CV",cvs[0]],[COMP[1][0]+": CV",cvs[1],AZUL]],{x0:200,aria:"CV"});
+  var absMaior=COMP[0][2]>COMP[1][2]?0:1, relMaior=cvs[0]>cvs[1]?0:1;
+  document.getElementById("compMsg").innerHTML = Math.abs(cvs[0]-cvs[1])<0.05 ? "As duas variam <b>o mesmo</b> em termos relativos." : "Maior variabilidade <b>absoluta</b>: "+COMP[absMaior][0]+". Maior variabilidade <b>relativa</b>: "+COMP[relMaior][0]+"."+(absMaior!==relMaior?" Repare: as duas medidas apontam em direções diferentes.":""); }
+comparar();
+
+/* temperatura */
+var tM=document.getElementById("tMed"), tD=document.getElementById("tDp");
+function temp(){ var m=+tM.value, s=+tD.value, mf=m*1.8+32, sf=s*1.8, cvc=s/m*100, cvf=sf/mf*100;
+  document.getElementById("tMedV").textContent=m; document.getElementById("tDpV").textContent=curto(s);
+  document.getElementById("tC").textContent="CV = "+pct(cvc); document.getElementById("tCtxt").textContent=curto(s)+" °C / "+m+" °C";
+  document.getElementById("tF").textContent="CV = "+pct(cvf); document.getElementById("tFtxt").textContent=curto(sf)+" °F / "+curto(mf)+" °F";
+  document.getElementById("tMsg").innerHTML="O mesmo fenômeno resulta em CV de <b>"+pct(cvc)+"</b> ou de <b>"+pct(cvf)+"</b>, dependendo da escala. Como Celsius e Fahrenheit têm zero arbitrário, o CV <b>não é adequado</b> para temperaturas: use o desvio padrão na própria escala."+(m===10&&s===2?" (Valores do Exercício 3 do livro.)":""); }
+tM.addEventListener("input", temp); tD.addEventListener("input", temp); temp();
+
+/* lucro */
+var lM=document.getElementById("lMed");
+function lucro(){ var m=+lM.value; document.getElementById("lMedV").textContent="R$ "+br(m,2);
+  var cv=m!==0?4/Math.abs(m)*100:NaN;
+  document.getElementById("lCV").textContent = m===0 ? "indefinido" : pct(cv);
+  document.getElementById("lMsg").innerHTML = m===0 ? "Com média zero, a divisão não está definida." : (Math.abs(m)<=2 ? "Com a média tão perto de zero, a razão amplifica qualquer variação. E o lucro pode ser negativo em alguns meses: o CV perde o sentido prático. Prefira informar o <b>desvio padrão de R$ 4,00</b>, com a média e a distribuição mensal." : "Repare como o CV cai à medida que a média se afasta de zero, sem que o desvio padrão tenha mudado."); }
+lM.addEventListener("input", lucro); lucro();
+
+/* arrastar e soltar */
+var ddOk=false;
+function checaCond(){ if(ddOk&&abasVistas.c2) liberar("cond"); }
+(function(){ var pref="dd1", itens=[["Peso de recém-nascidos (kg)","s"],["Comprimento de recém-nascidos (cm)","s"],["Consumo mensal de energia (kWh)","s"],["Preço de um produto (R$)","s"],["Temperatura em graus Celsius","n"],["Temperatura em graus Fahrenheit","n"],["Lucro mensal com média de R$ 1,00","n"]];
+  var banco=document.getElementById(pref+"Banco"), zonas=document.querySelectorAll("#"+pref+"Zonas .dd-zona"), msg=document.getElementById(pref+"Msg"), rest=itens.length, sel=null;
+  itens.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; banco.appendChild(d); ligar(d); });
+  function soltar(item,zona){ if(!zona) return;
+    if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent=item.dataset.z==="s"?"Correto: escala de razão, com zero absoluto e média longe de zero.":"Correto: zero arbitrário ou média perto de zero."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Tudo no lugar certo."; ddOk=true; checaCond(); } }
+    else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent="Ainda não. Pergunte-se: existe zero absoluto? A média está longe de zero?"; } }
+  function zonaEm(x,y){ var el=document.elementFromPoint(x,y); el=el?el.closest(".dd-zona"):null; return el&&el.parentNode.id===pref+"Zonas"?el:null; }
+  function ligar(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+    el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+      if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+      f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+    el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+      if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+      else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+  }
+  zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+})();
+
+/* laboratório */
+function lerNumeros(txt){ return txt.trim().split(/[\s;]+/).filter(Boolean).map(function(x){return Number(x.replace(/\./g,"").replace(",","."));}); }
+function st(d){ var n=d.length, m=d.reduce(function(a,b){return a+b;},0)/n, s=Math.sqrt(d.reduce(function(a,x){return a+(x-m)*(x-m);},0)/(n-1)); return {n:n,m:m,s:s,cv:m!==0?s/Math.abs(m)*100:NaN,neg:d.some(function(x){return x<0;})}; }
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var cj=[[document.getElementById("n1").value.trim()||"Conjunto 1",document.getElementById("lab1").value],[document.getElementById("n2").value.trim()||"Conjunto 2",document.getElementById("lab2").value]].filter(function(c){return c[1].trim();});
+  if(!cj.length){ erro.textContent="Digite pelo menos um conjunto."; return; }
+  var rs=[]; for(var i=0;i<cj.length;i++){ var d=lerNumeros(cj[i][1]); if(d.length<2){ erro.textContent=cj[i][0]+": digite pelo menos dois valores."; return; } if(d.some(function(x){return !isFinite(x);})){ erro.textContent=cj[i][0]+": há algum valor que não é número."; return; } if(d.length>500){ erro.textContent=cj[i][0]+": use no máximo 500 valores."; return; } var r=st(d); r.nome=cj[i][0].slice(0,30); rs.push(r); }
+  document.getElementById("labTab").innerHTML='<table class="freq"><tr><th>Conjunto</th><th>n</th><th>Média</th><th>Desvio padrão (s)</th><th>CV</th></tr>'+rs.map(function(r){return '<tr><td>'+r.nome+'</td><td>'+r.n+'</td><td>'+curto(r.m)+'</td><td>'+curto(r.s)+'</td><td><b>'+(isFinite(r.cv)?pct(r.cv):"—")+'</b></td></tr>';}).join("")+'</table>';
+  var ok=rs.filter(function(r){return isFinite(r.cv);});
+  document.getElementById("labGraf").innerHTML = ok.length ? barrasH(ok.map(function(r,i){return [r.nome,r.cv,i?AZUL:LAR];}),{x0:220,aria:"CV dos conjuntos"}) : "";
+  var av=[]; rs.forEach(function(r){ if(r.m===0) av.push(r.nome+": a média é zero, e o CV não está definido."); else if(r.neg) av.push(r.nome+": há valores negativos. Se a variável não tiver zero absoluto (como temperatura em °C ou lucro), o CV não é adequado."); else if(Math.abs(r.m)<r.s/2) av.push(r.nome+": a média está muito perto de zero em relação ao desvio padrão; o CV fica exagerado."); });
+  var txt = av.length ? '<div class="retorno nao" style="display:block">⚠ '+av.join("<br>⚠ ")+'</div>' : "";
+  if(rs.length===2&&!av.length) txt+='<p>'+(Math.abs(rs[0].cv-rs[1].cv)<0.05?"Os dois conjuntos têm a mesma variabilidade relativa.":"<b>"+(rs[0].cv>rs[1].cv?rs[0].nome:rs[1].nome)+"</b> tem maior variabilidade relativa.")+(rs[0].s>rs[1].s!==rs[0].cv>rs[1].cv?" Repare que o desvio padrão absoluto aponta na direção contrária.":"")+' Lembre-se de verificar se as duas variáveis têm zero absoluto.</p>';
+  document.getElementById("labMsg").innerHTML=txt;
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.getElementById("labEx").addEventListener("click", function(){ document.getElementById("n1").value="Semana 1 (pães)"; document.getElementById("lab1").value="100 102 98 101 99"; document.getElementById("n2").value="Semana 2 (pães)"; document.getElementById("lab2").value="80 120 95 105 100"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"Um conjunto tem média 80 e desvio padrão amostral 12. Qual é o CV?", o:["12%","15%","6,7%","92%"], c:1, x:"CV = (12 / 80) · 100% = 15%: o desvio padrão corresponde a 15% da média."},
+ {e:"Produto A: média R$ 50, desvio R$ 5. Produto B: média R$ 200, desvio R$ 16. Qual a comparação correta?", o:["B varia mais em termos absolutos e relativos","A varia mais em termos relativos (10% contra 8%); B, em termos absolutos","Os dois têm o mesmo CV","A varia mais em termos absolutos"], c:1, x:"CV(A) = 10%; CV(B) = 8%. O desvio absoluto de B é maior (R$ 16), mas representa uma fração menor do preço médio."},
+ {e:"Temperatura média de 10 °C, desvio de 2 °C (CV = 20%). Em Fahrenheit, média 50 °F e desvio 3,6 °F. O que isso mostra?", o:["Que o CV em °F (7,2%) é o correto","Que o CV muda com a escala, pois Celsius e Fahrenheit têm zero arbitrário: o CV não é adequado","Que a temperatura variou menos em Fahrenheit","Que houve erro de conversão"], c:1, x:"CV = 3,6 / 50 = 7,2% em °F, contra 20% em °C. O mesmo fenômeno dá CVs diferentes: sem zero absoluto, o CV não tem sentido."},
+ {e:"Pacotes com média estimada de 15 kg e desvio padrão de cerca de 6,67 kg (√44,44). Qual o CV?", o:["Cerca de 44,4%","15%","6,7%","Cerca de 225%"], c:0, x:"CV ≈ 6,67 / 15 ≈ 44,4% (44,7% se usar o desvio arredondado para 6,7). Como o peso tem zero absoluto, a medida é apropriada."},
+ {e:"Lucro mensal com média de R$ 1,00 e desvio padrão de R$ 4,00: CV = 400%. Como interpretar?", o:["A empresa é 400% mais arriscada que a média do mercado","O número não é confiável: a média está perto de zero e o lucro pode ser negativo; prefira o desvio padrão de R$ 4,00","O CV de 400% indica baixa variabilidade","O CV deveria ser 25%"], c:1, x:"Com média perto de zero, a razão amplifica qualquer variação, e lucros negativos tornam a variabilidade relativa sem sentido prático. Informe o desvio padrão na unidade original, com a média e a distribuição mensal."}
+];
+var qi=0, acq=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+acq+'/'+QUIZ.length+'</div><p>'+(acq>=4?"Excelente! Você está pronto para a Lição 12, a última do curso.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;acq=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+acq+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) acq++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

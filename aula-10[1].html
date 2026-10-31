@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 10 – Desvio padrão | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+
+.palpites{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.btn-sec.on-p{background:var(--laranja);color:#fff}
+.tipos-moda{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+.tipos-moda div{background:var(--fundo);border-top:3px solid var(--laranja);border-radius:4px;padding:14px;text-align:center}
+.tipos-moda b{display:block;color:var(--tinta);font-size:16px}
+.tipos-moda span{font-size:12px;color:var(--cinza)}
+@media (max-width:860px){.tipos-moda{grid-template-columns:1fr 1fr}}
+
+table.editavel input{width:70px;padding:6px 8px;font-size:15px;border:1px solid var(--linha);border-radius:4px;text-align:center;font-family:inherit}
+table.editavel input:focus{outline:2px solid var(--laranja);border-color:transparent}
+#tabDesv th{font-size:12px}
+#tabDesv td,#tabDesv th{padding:8px 6px}
+@media (max-width:860px){#tabDesv{font-size:13px}}
+
+.fila{position:relative;height:78px;margin:16px 0 8px;overflow:hidden}
+.ficha-f{position:absolute;left:0;top:20px;height:44px;display:grid;place-items:center;background:#fff;border:1px solid var(--linha);border-radius:6px;font-weight:700;color:var(--tinta);font-size:15px;transition:transform .7s cubic-bezier(.4,1.3,.5,1),background .3s,color .3s;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.ficha-f::before{content:attr(data-pos);position:absolute;top:-19px;font-size:11px;color:var(--cinza);font-weight:400}
+.ficha-f.centro{background:var(--verde);color:#fff;border-color:var(--verde)}
+.ficha-f.alterado{outline:2px dashed var(--laranja);outline-offset:2px}
+.treino-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza)}
+input.resp{width:120px;padding:10px 12px;font-size:16px;border:1px solid var(--linha);border-radius:6px;font-family:inherit}
+input.resp:focus{outline:2px solid var(--laranja);border-color:transparent}
+.dois-lados{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+.lado{border:1px solid var(--linha);border-radius:6px;padding:20px;background:#fff}
+.lado.on-lado{border:2px solid var(--laranja);background:var(--laranja-claro)}
+.lado p{font-size:16px;margin:0}
+.lado h3{margin:0 0 8px}
+.icone{font-size:34px;margin-bottom:6px}
+.passo2{display:none}.passo2.on{display:block;animation:surgir .4s}
+.passo2 h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo2 p{font-size:16px}
+@media (max-width:860px){.dois-lados{grid-template-columns:1fr}}
+
+table.freq tr.pisca2 td{background:#FFF4D6}
+.lado .rotulo{display:block}
+
+.rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:860px){.grafico.filaq{min-width:480px}}
+
+.dois-campos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.dois-campos label{font-size:13px;font-weight:700;color:var(--tinta);display:block;margin-bottom:6px}
+@media (max-width:860px){.dois-campos{grid-template-columns:1fr}}
+
+.quad{transform-box:fill-box;transform-origin:bottom center;animation:cresce .6s both}
+@keyframes cresce{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+.conversor{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:10px 0}
+.seta-c{font-size:13px;font-weight:700;color:var(--laranja);text-align:center}
+.lado h3{font-size:19px}
+@media (max-width:860px){.conversor{grid-template-columns:1fr}}
+
+.area-lado{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:center}
+@media (max-width:860px){.area-lado{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-aula="aula10">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 10 · Desvio padrão</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="feita"><span class="num">✓</span>Representando dados com gráficos</li>
+    <li class="feita"><span class="num">✓</span>Moda: o valor que mais se repete</li>
+    <li class="feita"><span class="num">✓</span>Média aritmética: o ponto de equilíbrio</li>
+    <li class="feita"><span class="num">✓</span>Mediana: o valor central</li>
+    <li class="feita"><span class="num">✓</span>Quartis, decis e percentis</li>
+    <li class="feita"><span class="num">✓</span>Amplitude e amplitude interquartil</li>
+    <li class="feita"><span class="num">✓</span>Variância</li>
+    <li class="ativa"><span class="num">10</span>Desvio padrão</li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 10 de 12 · Quão espalhados estão os dados?</div>
+    <h2>Desvio padrão: a dispersão na unidade dos dados</h2>
+    <p style="color:#E4E7EB">Cálculo, interpretação, regra empírica e dados agrupados</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 10</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 10. Na lição anterior, a variância mediu o afastamento dos dados em relação à média, considerando todos os valores. Mas o resultado veio em unidades estranhas: minutos ao quadrado, pontos ao quadrado. Ninguém pensa em minutos ao quadrado no dia a dia.</p>
+<p class="narra">A solução é simples: tirar a raiz quadrada da variância. A medida que resulta é o desvio padrão, e ela volta para a unidade original dos dados. A partir de agora, ela será a principal medida de dispersão do curso.</p>
+<p class="narra">Lembra da linha de ônibus irregular, com variância de quarenta e quatro vírgula cinco minutos ao quadrado? A raiz disso é cerca de seis vírgula sete minutos. E esse número tem uma leitura direta: em geral, uma viagem dessa linha se afasta da média de trinta minutos por cerca de seis vírgula sete minutos, para mais ou para menos. A outra linha, a pontual, tem desvio padrão de menos de um minuto. A comparação fica imediata.</p>
+<p class="narra">Vamos também visitar uma padaria que vendeu, em média, cem pães por dia em duas semanas diferentes. Na primeira, as vendas quase não variaram; na segunda, foram de oitenta a cento e vinte. O desvio padrão vai mostrar por que a segunda semana exige um estoque de segurança maior.</p>
+<p class="narra">E você vai conhecer a regra empírica: em distribuições em forma de sino, cerca de sessenta e oito por cento dos valores ficam a até um desvio padrão da média, e cerca de noventa e cinco por cento, a até dois. Mas atenção: essa regra não vale para qualquer distribuição, e você vai ver isso acontecer na tela.</p>
+<p class="narra">Na aula, você vai transformar uma área num lado de quadrado, desenhar faixas de desvio padrão, testar a regra empírica, estimar o desvio de dados agrupados e analisar os seus próprios dados. Vamos começar?</p>
+      </div></details>
+    </div>
+    <div class="citacao">O desvio padrão é a raiz quadrada da variância e expressa a dispersão dos dados na mesma unidade em que eles foram medidos.<small>TRIOLA, 2017</small></div>
+    <p>Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Calcular o desvio padrão amostral e populacional</li>
+      <li><span class="n">2</span>Interpretar o desvio padrão como afastamento típico</li>
+      <li><span class="n">3</span>Usar a regra empírica, sabendo quando ela vale</li>
+      <li><span class="n">4</span>Estimar o desvio padrão de dados agrupados</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Dispersão que se entende na hora</h2>
+    <div class="abas">
+      <button class="on" data-aba="a1">O que significa 6,7 minutos</button>
+      <button data-aba="a2">A padaria</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Na Lição 9, a <b>Linha 2</b> (22, 38, 25, 35 e 30 min) teve variância amostral de 44,5 min². A raiz: <b>s ≈ 6,7 minutos</b>. A <b>Linha 1</b>, com variância de 0,5 min², tem <b>s ≈ 0,7 minuto</b>.</p>
+      <div id="linhasGraf"></div>
+      <p>Leitura direta: em geral, uma viagem da Linha 2 se afasta da média de 30 minutos por cerca de 6,7 minutos, para mais ou para menos. A faixa sombreada vai de uma média menos um desvio padrão até uma média mais um desvio padrão.</p>
+    </div>
+    <div class="painel" id="a2">
+      <p>Uma padaria vendeu, por dia, na <b>Semana 1</b>: 100, 102, 98, 101 e 99 pães; na <b>Semana 2</b>: 80, 120, 95, 105 e 100 pães. Média de 100 pães nas duas.</p>
+      <div id="fig11"></div>
+      <p class="fonte">Figura 11 – Vendas diárias de pães em duas semanas, com a média de 100 pães (linha tracejada) e a faixa de um desvio padrão (dados fictícios). Fonte: elaboração do autor.</p>
+      <p>Variâncias: 2,5 e 212,5 pães². Desvios padrão: <b>cerca de 1,6 e 14,6 pães por dia</b>. A faixa da Semana 1 (de 98,4 a 101,6) é tão estreita que quase some atrás dos pontos; a da Semana 2 (de 85,4 a 114,6) mostra um movimento muito mais irregular, que exige estoque de segurança maior.</p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. DEFINIÇÃO -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Definição e cálculo</div>
+    <h2>σ = √σ² &nbsp;e&nbsp; s = √s²</h2>
+    <p>Três passos: (1) calcule a média; (2) calcule a variância, dividindo a soma dos quadrados dos desvios por N ou por n − 1; (3) extraia a raiz quadrada.</p>
+    <h3>A variância é uma área; o desvio padrão é o lado</h3>
+    <p>Na Lição 9, os desvios viraram quadrados. A variância é uma espécie de “quadrado médio”; o desvio padrão é o <b>lado</b> desse quadrado. Mude a variância e veja.</p>
+    <div class="painel-calc">
+      <label for="varS">Variância: <b id="varV">44,5</b> (unidade²)</label>
+      <input type="range" id="varS" min="0" max="250" step="0.5" value="44.5">
+      <div class="area-lado">
+        <div id="quadVar"></div>
+        <div class="caixas uma-col">
+          <div class="caixa"><span>Área (variância)</span><b id="cxArea">44,5 u²</b></div>
+          <div class="caixa destaque-cx"><span>Lado (desvio padrão)</span><b id="cxLado">6,67 u</b></div>
+        </div>
+      </div>
+      <p class="fonte" id="varMsg"></p><p class="fonte">u = unidade dos dados (minutos, pães, quilos...).</p>
+    </div>
+    <div class="questao" data-q="raiz">
+      <div class="enunciado">Uma população tem variância de 2 kg². Qual é o desvio padrão populacional?</div>
+      <button class="opcao"><span class="radio"></span>1 kg</button>
+      <button class="opcao" data-certa><span class="radio"></span>Cerca de 1,41 kg</button>
+      <button class="opcao"><span class="radio"></span>4 kg</button>
+      <button class="opcao"><span class="radio"></span>2 kg</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. σ = √2 ≈ 1,41 kg: um afastamento típico de cerca de 1,41 kg em relação à média populacional." data-nao="Não é essa. O desvio padrão é a raiz quadrada da variância: σ = √2 ≈ 1,41 kg. Repare que ele volta para quilogramas, a unidade dos dados."></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3" data-trava="raiz">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 3. INTERPRETAÇÃO -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Interpretando o desvio padrão</div>
+    <h2>O afastamento típico em relação à média</h2>
+    <p>Quanto maior o desvio padrão, mais os dados se espalham em torno do centro.</p>
+    <div class="cartoes">
+      <button class="cartao"><div class="giro"><div class="face frente">Pode ser negativo?<small>Clique para virar</small></div><div class="face verso">Não. A variância é sempre não negativa, e o desvio padrão também. Um valor negativo indica erro de cálculo.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">É o desvio médio?<small>Clique para virar</small></div><div class="face verso">Não. É uma forma de média quadrática, que dá mais peso aos desvios grandes.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Em que unidade?<small>Clique para virar</small></div><div class="face verso">Na mesma unidade dos dados: minutos, pães, quilos. Por isso a leitura é direta.</div></div></button>
+    </div>
+    <div class="acordeao">
+      <details><summary>Veja a diferença na Semana 2 da padaria</summary><div class="corpo"><p>Desvios: −20, +20, −5, +5 e 0. A média dos desvios <i>sem sinal</i> seria (20 + 20 + 5 + 5 + 0) / 5 = 10 pães. Já o desvio padrão é ≈ 14,6 pães: maior, porque os quadrados dão mais peso aos desvios grandes de 20. (Cálculo de comparação feito a partir dos dados do livro.)</p></div></details>
+    </div>
+    <div class="questao" data-q="caixa">
+      <div class="enunciado">Dois caixas de supermercado têm tempo médio de atendimento de 4 minutos. O caixa 1 tem desvio padrão de 0,5 minuto; o caixa 2, de 2 minutos. Qual é mais previsível para o cliente?</div>
+      <button class="opcao" data-certa><span class="radio"></span>O caixa 1, porque seus atendimentos se concentram mais em torno de 4 minutos</button>
+      <button class="opcao"><span class="radio"></span>O caixa 2, porque tem desvio padrão maior</button>
+      <button class="opcao"><span class="radio"></span>Os dois, porque têm a mesma média</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. Com a mesma média, o desvio padrão menor indica atendimentos mais concentrados em torno de 4 minutos. No caixa 2, eles podem ser bem mais rápidos ou bem mais demorados." data-nao="Não é essa. A média igual não garante a mesma previsibilidade. O caixa 1, com desvio padrão de 0,5 minuto, tem atendimentos mais concentrados em torno de 4 minutos."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4" data-trava="caixa">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 4. REGRA EMPÍRICA -->
+<section class="secao" data-s="4">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">A regra empírica</div>
+    <h2>68% e 95%, mas só em forma de sino</h2>
+    <p>Em distribuições aproximadamente simétricas e em forma de sino, costuma-se observar que <b>cerca de 68%</b> dos valores estão a até um desvio padrão da média, e <b>cerca de 95%</b>, a até dois. Teste com dois conjuntos simulados de 1.000 valores.</p>
+    <div class="painel-calc">
+      <div class="controles">
+        <button class="btn-sec on-p" id="dSino">Forma de sino</button>
+        <button class="btn-sec" id="dAssim">Muito assimétrica</button>
+      </div>
+      <div class="controles">
+        <label class="chk"><input type="checkbox" id="f1" checked> Faixa de ±1 desvio padrão</label>
+        <label class="chk"><input type="checkbox" id="f2"> Faixa de ±2 desvios padrão</label>
+      </div>
+      <div id="regraGraf"></div>
+      <div class="caixas">
+        <div class="caixa"><span>Dentro de ±1s</span><b id="den1">—</b></div>
+        <div class="caixa"><span>Dentro de ±2s</span><b id="den2">—</b></div>
+        <div class="caixa destaque-cx"><span>Leitura</span><b id="regraLeit" style="font-size:16px">—</b></div>
+      </div>
+      <p class="fonte">Dados simulados, apenas para ilustração. A regra empírica não vale para qualquer distribuição; as suas condições de uso devem ser conferidas na bibliografia antes de aplicações formais.</p>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="5" data-trava="regra">Continuar</button><div class="dica-trava">Veja as duas distribuições com as duas faixas para continuar</div></div>
+</section>
+
+<!-- 5. AGRUPADOS + CRÍTICA -->
+<section class="secao" data-s="5">
+  <div class="bloco">
+    <div class="rotulo">Desvio padrão de dados agrupados</div>
+    <h2>Primeiro a variância, depois a raiz</h2>
+    <div class="formula" style="font-size:18px;text-align:center">s ≈ √[ Σfᵢ(xᵢ − x̄)² / (n − 1) ]</div>
+    <p>O peso de 10 pacotes: [0; 10) kg com 2; [10; 20) kg com 6; [20; 30) kg com 2. Clique para avançar.</p>
+    <div class="controles"><button class="btn-sec" id="agProx">Próximo passo</button><button class="btn-sec" id="agReset">Recomeçar</button></div>
+    <table class="freq" id="tabAg"></table>
+    <div id="agMsg"></div>
+    <div class="questao" data-q="rel">
+      <div class="enunciado">Um relatório informa: média de vendas mensais de 100 unidades, variância de 25 unidades² e desvio padrão de 25 unidades. Há erro?</div>
+      <button class="opcao"><span class="radio"></span>Não, variância e desvio padrão costumam ser iguais</button>
+      <button class="opcao" data-certa><span class="radio"></span>Sim: o desvio padrão é √25 = 5 unidades</button>
+      <button class="opcao"><span class="radio"></span>Sim: o desvio padrão seria 625 unidades</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. O relatório confundiu as duas medidas. Com variância de 25 unidades², o desvio padrão é 5 unidades: as vendas se afastam da média de 100 por cerca de 5, para mais ou para menos. Informar 25 exageraria a variação." data-nao="Não é essa. O desvio padrão é a raiz da variância: √25 = 5 unidades. O relatório confundiu as duas medidas, o que pode levar a conclusões exageradas."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="6" data-trava="agrel">Continuar</button><div class="dica-trava">Complete o cálculo e responda a questão para continuar</div></div>
+</section>
+
+<!-- 6. VANTAGENS -->
+<section class="secao" data-s="6">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Vantagens e limitações</div>
+    <h2>A medida de dispersão mais usada</h2>
+    <p>Arraste cada característica para a coluna certa.</p>
+    <p class="fonte">No celular, toque na característica e depois toque na coluna.</p>
+    <div class="dd-banco" id="dd1Banco"></div>
+    <div class="dd-zonas" id="dd1Zonas" style="grid-template-columns:1fr 1fr">
+      <div class="dd-zona" data-z="v"><h4>✓ Vantagem</h4></div>
+      <div class="dd-zona" data-z="l"><h4>⚠ Limitação</h4></div>
+    </div>
+    <div class="dd-msg" id="dd1Msg"></div>
+    <div class="citacao" id="ddConc" style="display:none">Para comparar a dispersão de variáveis em unidades diferentes, ou com médias muito distintas, a medida mais adequada é o <b>coeficiente de variação</b>, tema da próxima lição.</div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="7" data-trava="dd1">Continuar</button><div class="dica-trava">Classifique todas as características para continuar</div></div>
+</section>
+
+<!-- 7. LABORATÓRIO -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">O desvio padrão dos seus dados</h3>
+      <p>Digite os valores (vírgula para decimais; espaço ou ponto e vírgula para separar). A aula calcula média, variância e desvio padrão, desenha as faixas de ±1 e ±2 desvios e conta quantos valores caem em cada uma.</p>
+    </div>
+    <div style="margin-top:20px">
+      <textarea id="labDados" rows="2" placeholder="Ex.: 80 120 95 105 100"></textarea>
+      <div class="erro-txt" id="labErro"></div>
+      <div class="controles" style="align-items:center">
+        <label class="chk"><input type="radio" name="tipo" value="a" checked> Amostra (s)</label>
+        <label class="chk"><input type="radio" name="tipo" value="p"> População (σ)</label>
+      </div>
+      <div class="controles">
+        <button class="btn-sec" id="labGerar">Calcular</button>
+        <button class="btn-sec" id="labEx1">Exemplo: 4, 6, 8, 10, 12</button>
+        <button class="btn-sec" id="labEx2">Exemplo: padaria, Semana 2</button>
+      </div>
+      <div id="labRes"></div>
+      <div id="labGraf"></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8">Continuar</button></div>
+</section>
+
+<!-- 8. RESUMO -->
+<section class="secao" data-s="8">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="acordeao">
+      <details><summary>Definição</summary><div class="corpo"><p>O desvio padrão é a raiz quadrada da variância: σ = √σ² (população) e s = √s² (amostra).</p></div></details>
+      <details><summary>Interpretação</summary><div class="corpo"><p>Indica o afastamento típico dos valores em relação à média, na mesma unidade dos dados.</p></div></details>
+      <details><summary>Regra empírica</summary><div class="corpo"><p>Em distribuições aproximadamente em forma de sino, cerca de 68% dos valores ficam a até 1 desvio padrão da média e cerca de 95%, a até 2. Não vale para qualquer distribuição.</p></div></details>
+      <details><summary>Dados agrupados</summary><div class="corpo"><p>Estimado a partir dos pontos médios das classes; o resultado é aproximado.</p></div></details>
+      <details><summary>Cuidados</summary><div class="corpo"><p>É sensível a valores extremos, e sua interpretação depende da forma da distribuição.</p></div></details>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="9">Ir para o quiz</button></div>
+</section>
+
+<!-- 9. QUIZ -->
+<section class="secao" data-s="9">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 10 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões sobre o Capítulo 10, a maioria tirada dos exercícios do livro.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=10, CHAVE="decastro-estat-l10", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+function curto(v){ if(Math.abs(v)<1e-9) v=0; var s=br(v,2); return s.replace(/,00$/,"").replace(/(,\d)0$/,"$1"); }
+function stats(d,pop){ var n=d.length, m=d.reduce(function(a,b){return a+b;},0)/n, sq=d.reduce(function(a,x){return a+(x-m)*(x-m);},0), v=sq/(pop?n:n-1); return {n:n,media:m,sq:sq,v:v,s:Math.sqrt(v)}; }
+var LAR="#E4572E", CLARO="#F6B9A4", TINTA="#1F2933", VERDE="#2F9E6E", AZUL="#3E6FB0";
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao"));
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+var duplo={ag:false,rel:false};
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; if(q.dataset.q==="rel"){ duplo.rel=true; if(duplo.ag) liberar("agrel"); } else liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* pontos com faixas de desvio padrão, várias linhas */
+function faixas(linhas, o){
+  o=o||{}; var W=560, lh=o.alto||74, top=24, H=top+linhas.length*lh+26, x0=o.rotulo?84:24, x1=540, mn=o.min, mx=o.max;
+  function X(v){return x0+(x1-x0)*(Math.max(mn,Math.min(mx,v))-mn)/(mx-mn);}
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Valores com faixas de desvio padrão">'];
+  linhas.forEach(function(l,li){ var y0=top+li*lh, base=y0+lh-20, st=stats(l.d,o.pop);
+    if(o.rotulo) s.push('<text x="4" y="'+(base-8)+'" font-size="13" font-weight="700" fill="'+TINTA+'">'+l.nome+'</text><text x="4" y="'+(base+8)+'" font-size="11" fill="#7B8794">s ≈ '+curto(st.s)+'</text>');
+    if(o.f2) s.push('<rect x="'+X(st.media-2*st.s)+'" y="'+(y0+6)+'" width="'+(X(st.media+2*st.s)-X(st.media-2*st.s))+'" height="'+(base-y0-2)+'" fill="'+AZUL+'" opacity=".08"/>');
+    s.push('<rect x="'+X(st.media-st.s)+'" y="'+(y0+6)+'" width="'+Math.max(1.5,X(st.media+st.s)-X(st.media-st.s))+'" height="'+(base-y0-2)+'" fill="'+VERDE+'" opacity=".18"/>');
+    s.push('<line x1="'+x0+'" x2="'+x1+'" y1="'+base+'" y2="'+base+'" stroke="#CBD2D9"/>');
+    var p={}, cnt={}, mp=1; l.d.forEach(function(v){ var k=Math.round(X(v)/6); cnt[k]=(cnt[k]||0)+1; mp=Math.max(mp,cnt[k]); }); var dy=Math.min(12,(base-y0-14)/mp);
+    l.d.forEach(function(v){ var k=Math.round(X(v)/6), h=p[k]||0; p[k]=h+1; s.push('<circle cx="'+X(v)+'" cy="'+(base-6-h*dy)+'" r="'+(o.raio||6)+'" fill="'+(l.cor||LAR)+'"><title>'+curto(v)+'</title></circle>'); });
+    s.push('<line x1="'+X(st.media)+'" x2="'+X(st.media)+'" y1="'+(y0+4)+'" y2="'+(base+4)+'" stroke="'+TINTA+'" stroke-width="2" stroke-dasharray="5 4"/>');
+  });
+  (o.ticks||[]).forEach(function(t){ s.push('<text x="'+X(t)+'" y="'+(H-6)+'" font-size="11" text-anchor="middle" fill="#7B8794">'+curto(t)+'</text>'); });
+  s.push('<text x="'+x1+'" y="14" font-size="11" text-anchor="end" fill="#7B8794"><tspan fill="'+VERDE+'">■</tspan> ±1 desvio padrão'+(o.f2?' <tspan fill="'+AZUL+'">■</tspan> ±2':'')+' · - - média</text>');
+  return s.join("")+'</svg>';
+}
+function marcas(a,b,p){ var t=[]; for(var v=a; v<=b+1e-9; v+=p) t.push(+v.toFixed(6)); return t; }
+document.getElementById("linhasGraf").innerHTML=faixas([{nome:"Linha 1",d:[30,31,29,30,30]},{nome:"Linha 2",d:[22,38,25,35,30],cor:AZUL}],{rotulo:true,min:18,max:42,ticks:marcas(20,40,5)});
+document.getElementById("fig11").innerHTML=faixas([{nome:"Semana 1",d:[100,102,98,101,99]},{nome:"Semana 2",d:[80,120,95,105,100],cor:AZUL}],{rotulo:true,min:75,max:125,ticks:marcas(75,125,5)});
+
+/* área e lado */
+var vs=document.getElementById("varS");
+function areaLado(){ var v=+vs.value, l=Math.sqrt(v), W=260, H=260, esc=240/Math.sqrt(250), lp=l*esc;
+  document.getElementById("varV").textContent=curto(v); document.getElementById("cxArea").textContent=curto(v)+" u²"; document.getElementById("cxLado").textContent=curto(l)+" u";
+  document.getElementById("quadVar").innerHTML='<svg class="grafico" viewBox="0 0 '+W+' '+H+'" style="max-width:260px" role="img" aria-label="Quadrado cuja área é a variância e cujo lado é o desvio padrão"><rect x="10" y="'+(250-lp)+'" width="'+lp+'" height="'+lp+'" fill="'+VERDE+'" fill-opacity=".18" stroke="'+VERDE+'" stroke-width="2"/>'+(lp>40?'<text x="'+(10+lp/2)+'" y="'+(250-lp/2+5)+'" font-size="13" font-weight="700" text-anchor="middle" fill="'+TINTA+'">área '+curto(v)+'</text>':'')+'<line x1="10" x2="'+(10+lp)+'" y1="'+(254)+'" y2="'+(254)+'" stroke="'+LAR+'" stroke-width="4"/><text x="'+(10+Math.max(lp,60)/2)+'" y="'+(Math.max(250-lp-6,12))+'" font-size="12" font-weight="700" text-anchor="middle" fill="'+LAR+'">lado '+curto(l)+'</text></svg>';
+  var m=""; if(Math.abs(v-44.5)<0.01) m="44,5 min² é a variância da Linha 2: o lado, ≈ 6,7 min, é o desvio padrão."; else if(Math.abs(v-212.5)<0.01) m="212,5 é a variância da Semana 2 da padaria: o lado, ≈ 14,6, é o desvio padrão."; else if(Math.abs(v-2.5)<0.01) m="2,5 é a variância da Semana 1 da padaria: o lado, ≈ 1,6, é o desvio padrão."; else if(Math.abs(v-0.5)<0.01) m="0,5 é a variância da Linha 1: o lado, ≈ 0,7, é o desvio padrão."; else m="Experimente 0,5; 2,5; 44,5 e 212,5, as variâncias dos exemplos do livro.";
+  document.getElementById("varMsg").textContent=m; }
+vs.addEventListener("input", areaLado); areaLado();
+
+/* regra empírica */
+function rng(seed){ return function(){ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; }; }
+function gerar(tipo){ var r=rng(tipo==="sino"?21:33), a=[]; for(var i=0;i<1000;i++){ var u=Math.max(1e-9,r()), v=r(), z=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); if(tipo==="sino") a.push(50+10*z); else a.push(20+12*(-Math.log(Math.max(1e-9,r())))); } return a; }
+var DIST={sino:gerar("sino"),assim:gerar("assim")}, dAt="sino", vistos={};
+function regra(){ var d=DIST[dAt], st=stats(d), f1=document.getElementById("f1").checked, f2=document.getElementById("f2").checked;
+  var c1=d.filter(function(x){return Math.abs(x-st.media)<=st.s;}).length/10, c2=d.filter(function(x){return Math.abs(x-st.media)<=2*st.s;}).length/10;
+  var mn=dAt==="sino"?10:15, mx=dAt==="sino"?90:110, nb=40, bw=(mx-mn)/nb, bins=new Array(nb).fill(0); d.forEach(function(x){ var i=Math.floor((x-mn)/bw); if(i>=0&&i<nb) bins[i]++; });
+  var W=560,H=250,m={l:20,r:10,t:16,b:30}, iw=W-m.l-m.r, ih=H-m.t-m.b, top=Math.max.apply(null,bins); function X(v){return m.l+iw*(v-mn)/(mx-mn);} function Y(c){return m.t+ih-ih*c/top;}
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Histograma de 1.000 valores simulados com faixas de desvio padrão">'];
+  if(f2) s.push('<rect x="'+X(st.media-2*st.s)+'" y="'+m.t+'" width="'+(X(st.media+2*st.s)-X(st.media-2*st.s))+'" height="'+ih+'" fill="'+AZUL+'" opacity=".10"/>');
+  if(f1) s.push('<rect x="'+X(st.media-st.s)+'" y="'+m.t+'" width="'+(X(st.media+st.s)-X(st.media-st.s))+'" height="'+ih+'" fill="'+VERDE+'" opacity=".18"/>');
+  bins.forEach(function(c,i){ s.push('<rect x="'+X(mn+i*bw)+'" y="'+Y(c)+'" width="'+(X(bw)-X(0)-1)+'" height="'+(Y(0)-Y(c))+'" fill="'+LAR+'" opacity=".85"/>'); });
+  s.push('<line x1="'+X(st.media)+'" x2="'+X(st.media)+'" y1="'+m.t+'" y2="'+Y(0)+'" stroke="'+TINTA+'" stroke-width="2" stroke-dasharray="5 4"/>');
+  [-2,-1,1,2].forEach(function(k){ if((Math.abs(k)===1&&f1)||(Math.abs(k)===2&&f2)) s.push('<text x="'+X(st.media+k*st.s)+'" y="'+(H-14)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+(Math.abs(k)===1?VERDE:AZUL)+'">'+(k>0?"+":"−")+Math.abs(k)+'s</text>'); });
+  s.push('<text x="'+X(st.media)+'" y="'+(H-14)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+TINTA+'">x̄</text><line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="#9AA5B1"/></svg>');
+  document.getElementById("regraGraf").innerHTML=s.join("");
+  document.getElementById("den1").textContent=br(c1,1)+"%"; document.getElementById("den2").textContent=br(c2,1)+"%";
+  document.getElementById("regraLeit").textContent = dAt==="sino" ? "Perto de 68% e 95%: a regra funciona" : "Longe de 68%: a regra não se aplica";
+  if(f1&&f2){ vistos[dAt]=1; if(vistos.sino&&vistos.assim) liberar("regra"); }
+}
+document.getElementById("dSino").addEventListener("click", function(){ dAt="sino"; this.classList.add("on-p"); document.getElementById("dAssim").classList.remove("on-p"); regra(); });
+document.getElementById("dAssim").addEventListener("click", function(){ dAt="assim"; this.classList.add("on-p"); document.getElementById("dSino").classList.remove("on-p"); regra(); });
+document.getElementById("f1").addEventListener("change", regra); document.getElementById("f2").addEventListener("change", regra); regra();
+
+/* agrupados */
+var agN=0;
+function agrup(){ var cl=[[0,10,2],[10,20,6],[20,30,2]];
+  var h='<tr><th>Classe (kg)</th><th>fᵢ</th><th>xᵢ</th>'+(agN>=2?'<th>fᵢ · xᵢ</th>':'')+(agN>=3?'<th>(xᵢ − x̄)²</th><th>fᵢ(xᵢ − x̄)²</th>':'')+'</tr>';
+  cl.forEach(function(c){ var pm=(c[0]+c[1])/2, d2=(pm-15)*(pm-15); h+='<tr><td>['+c[0]+'; '+c[1]+')</td><td>'+c[2]+'</td><td>'+(agN>=1?pm:"?")+'</td>'+(agN>=2?'<td>'+c[2]*pm+'</td>':'')+(agN>=3?'<td>'+d2+'</td><td>'+c[2]*d2+'</td>':'')+'</tr>'; });
+  h+='<tr class="total"><td>Total</td><td>10</td><td>—</td>'+(agN>=2?'<td>150</td>':'')+(agN>=3?'<td>—</td><td>400</td>':'')+'</tr>';
+  document.getElementById("tabAg").innerHTML=h;
+  var msgs=["","Passo 1: pontos médios 5, 15 e 25 kg.","Passo 2: média estimada x̄ = 150 / 10 = <b>15 kg</b>.","Passo 3: soma ponderada dos quadrados dos desvios = 200 + 0 + 200 = <b>400</b>.","Passo 4: s² ≈ 400 / (10 − 1) ≈ 44,4 kg² → <b>s ≈ √44,4 ≈ 6,7 kg</b>. É uma estimativa, pois os valores originais de cada classe não são conhecidos."];
+  document.getElementById("agMsg").innerHTML='<div class="formula">'+(msgs[agN]||"Clique em “Próximo passo”.")+'</div>';
+  document.getElementById("agProx").disabled=agN>=4; if(agN>=4){ duplo.ag=true; if(duplo.rel) liberar("agrel"); } }
+document.getElementById("agProx").addEventListener("click", function(){ agN++; agrup(); });
+document.getElementById("agReset").addEventListener("click", function(){ agN=0; agrup(); });
+agrup();
+
+/* arrastar e soltar */
+(function(){ var pref="dd1", itens=[["Considera todos os valores","v"],["Está na mesma unidade dos dados","v"],["É a medida de dispersão mais utilizada","v"],["É sensível a valores extremos","l"],["Sua interpretação depende da forma da distribuição","l"],["Não serve para comparar variáveis em unidades diferentes","l"]];
+  var banco=document.getElementById(pref+"Banco"), zonas=document.querySelectorAll("#"+pref+"Zonas .dd-zona"), msg=document.getElementById(pref+"Msg"), rest=itens.length, sel=null;
+  itens.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; banco.appendChild(d); ligar(d); });
+  function soltar(item,zona){ if(!zona) return;
+    if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent="Correto."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Tudo no lugar certo."; liberar("dd1"); document.getElementById("ddConc").style.display="block"; } }
+    else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent="Ainda não. Pense se a característica ajuda ou atrapalha a interpretação."; } }
+  function zonaEm(x,y){ var el=document.elementFromPoint(x,y); el=el?el.closest(".dd-zona"):null; return el&&el.parentNode.id===pref+"Zonas"?el:null; }
+  function ligar(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+    el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+      if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+      f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+    el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+      if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+      else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+  }
+  zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+})();
+
+/* laboratório */
+function lerNumeros(txt){ return txt.trim().split(/[\s;]+/).filter(Boolean).map(function(x){return Number(x.replace(/\./g,"").replace(",","."));}); }
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var d=lerNumeros(document.getElementById("labDados").value), pop=document.querySelector('input[name="tipo"]:checked').value==="p";
+  if(d.length<2){ erro.textContent="Digite pelo menos dois valores."; return; }
+  if(d.some(function(x){return !isFinite(x);})){ erro.textContent="Há algum valor que não é número. Separe com espaço ou ponto e vírgula, e use vírgula só para decimais."; return; }
+  if(d.length>500){ erro.textContent="Use no máximo 500 valores."; return; }
+  var st=stats(d,pop), sim=pop?"σ":"s", n=d.length;
+  var c1=d.filter(function(x){return Math.abs(x-st.media)<=st.s+1e-9;}).length, c2=d.filter(function(x){return Math.abs(x-st.media)<=2*st.s+1e-9;}).length;
+  document.getElementById("labRes").innerHTML='<div class="caixas"><div class="caixa"><span>Média</span><b>'+curto(st.media)+'</b></div><div class="caixa"><span>Variância '+sim+'²</span><b>'+curto(st.v)+'</b></div><div class="caixa destaque-cx"><span>Desvio padrão '+sim+'</span><b>'+curto(st.s)+'</b></div></div>'+
+    '<p>Em geral, os valores se afastam da média de '+curto(st.media)+' por cerca de <b>'+curto(st.s)+'</b> (na unidade dos seus dados), para mais ou para menos.</p>'+
+    '<div class="caixas"><div class="caixa"><span>Dentro de ±1 '+sim+' ('+curto(st.media-st.s)+' a '+curto(st.media+st.s)+')</span><b>'+c1+' de '+n+' ('+Math.round(c1/n*100)+'%)</b></div><div class="caixa"><span>Dentro de ±2 '+sim+' ('+curto(st.media-2*st.s)+' a '+curto(st.media+2*st.s)+')</span><b>'+c2+' de '+n+' ('+Math.round(c2/n*100)+'%)</b></div></div>'+
+    (n<20?'<p class="fonte">Com poucos valores, não compare com a regra empírica: ela descreve distribuições em forma de sino, com muitos dados.</p>':'<p class="fonte">Se os seus dados tiverem forma de sino, esses percentuais devem ficar perto de 68% e 95%.</p>');
+  var mn=Math.min.apply(null,d.concat([st.media-2*st.s])), mx=Math.max.apply(null,d.concat([st.media+2*st.s])), pad=(mx-mn)*0.03||1;
+  document.getElementById("labGraf").innerHTML=faixas([{d:d}],{min:mn-pad,max:mx+pad,f2:true,pop:pop,ticks:[st.media-2*st.s,st.media-st.s,st.media,st.media+st.s,st.media+2*st.s],alto:110,raio:d.length>60?3.5:6});
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.querySelectorAll('input[name="tipo"]').forEach(function(r){ r.addEventListener("change", function(){ if(document.getElementById("labDados").value.trim()) lab(); }); });
+document.getElementById("labEx1").addEventListener("click", function(){ document.getElementById("labDados").value="4 6 8 10 12"; lab(); });
+document.getElementById("labEx2").addEventListener("click", function(){ document.getElementById("labDados").value="80 120 95 105 100"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"Qual é o desvio padrão amostral dos valores 4, 6, 8, 10 e 12?", o:["10","Cerca de 3,16","2,83","8"], c:1, x:"Média 8; desvios −4, −2, 0, +2, +4; soma dos quadrados 40; s² = 40 / 4 = 10; s = √10 ≈ 3,16."},
+ {e:"Pesos agrupados: [0; 10) kg com 2; [10; 20) kg com 6; [20; 30) kg com 2. Qual o desvio padrão amostral estimado?", o:["Cerca de 6,7 kg","15 kg","44,4 kg","Cerca de 6,3 kg"], c:0, x:"Pontos médios 5, 15, 25; x̄ = 15; soma ponderada dos quadrados 400; s² ≈ 400 / 9 ≈ 44,4 kg²; s ≈ 6,7 kg."},
+ {e:"Na Semana 1 da padaria (100, 102, 98, 101 e 99 pães), a variância amostral é 2,5. Qual o desvio padrão?", o:["2,5 pães","Cerca de 1,58 pão","6,25 pães","0,5 pão"], c:1, x:"s = √2,5 ≈ 1,58 pão por dia. Na Semana 2, √212,5 ≈ 14,58 pães."},
+ {e:"Um relatório informa variância de 25 unidades² e desvio padrão de 25 unidades. Qual seria o desvio padrão correto?", o:["625 unidades","12,5 unidades","5 unidades","25 unidades"], c:2, x:"O desvio padrão é a raiz da variância: √25 = 5 unidades. O relatório confundiu as medidas."},
+ {e:"Sobre a regra empírica (cerca de 68% a até 1 desvio padrão e 95% a até 2), é correto dizer que:", o:["Vale para qualquer conjunto de dados","Vale para distribuições aproximadamente simétricas e em forma de sino","Só vale para dados qualitativos","Garante que 100% dos dados estão a até 2 desvios"], c:1, x:"A regra empírica descreve distribuições aproximadamente simétricas e em forma de sino. Em distribuições muito assimétricas, os percentuais podem ser bem diferentes."}
+];
+var qi=0, acq=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+acq+'/'+QUIZ.length+'</div><p>'+(acq>=4?"Excelente! Você está pronto para a Lição 11.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;acq=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+acq+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) acq++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

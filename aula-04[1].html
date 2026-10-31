@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 4 – Moda: o valor que mais se repete | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+
+.palpites{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.btn-sec.on-p{background:var(--laranja);color:#fff}
+.tipos-moda{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+.tipos-moda div{background:var(--fundo);border-top:3px solid var(--laranja);border-radius:4px;padding:14px;text-align:center}
+.tipos-moda b{display:block;color:var(--tinta);font-size:16px}
+.tipos-moda span{font-size:12px;color:var(--cinza)}
+@media (max-width:860px){.tipos-moda{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body data-aula="aula04">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 4 · Moda: o valor que mais se repete</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="feita"><span class="num">✓</span>Representando dados com gráficos</li>
+    <li class="ativa"><span class="num">4</span>Moda: o valor que mais se repete</li>
+    <li><span class="num">5</span>Média aritmética: o ponto de equilíbrio<span class="cad">🔒</span></li>
+    <li><span class="num">6</span>Mediana: o valor central<span class="cad">🔒</span></li>
+    <li><span class="num">7</span>Quartis, decis e percentis<span class="cad">🔒</span></li>
+    <li><span class="num">8</span>Amplitude e amplitude interquartil<span class="cad">🔒</span></li>
+    <li><span class="num">9</span>Variância<span class="cad">🔒</span></li>
+    <li><span class="num">10</span>Desvio padrão<span class="cad">🔒</span></li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 4 de 12 · Onde fica o centro dos dados?</div>
+    <h2>Moda: o valor que mais se repete</h2>
+    <p style="color:#E4E7EB">Moda, classificação quanto ao número de modas e moda em dados agrupados</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 4</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 4. Com ela, começamos uma nova etapa da trilha. Nas três primeiras lições, aprendemos a organizar os dados em tabelas e a mostrá-los em gráficos. Agora vamos resumir um conjunto inteiro em um único número que represente o seu centro. São as medidas de tendência central, e a primeira delas é a moda.</p>
+<p class="narra">Lembra da lista de idades da turma, lá da Lição 1? Alguém percebeu que a idade dezesseis aparecia muitas vezes. Esse trabalho de contagem, feito sem nenhuma fórmula, é exatamente o que a Estatística chama de moda: o valor que mais se repete.</p>
+<p class="narra">A moda tem uma qualidade especial. Ela depende apenas da contagem. Por isso, funciona até com dados que não são números, como a cor preferida de um grupo de pessoas. Ninguém consegue calcular a média de azul e verde, mas todo mundo consegue dizer qual cor foi a mais escolhida.</p>
+<p class="narra">Você também vai descobrir que um conjunto pode ter uma moda, duas, várias, ou nenhuma. E que duas modas podem ser um sinal de dois grupos diferentes misturados nos dados, como pessoas que treinam pouco e pessoas que treinam muito.</p>
+<p class="narra">Na parte final, voltamos às classes da Lição 2. Quando os dados estão agrupados, não temos mais os valores individuais, e a moda passa a ser estimada pela fórmula de Czuber, a partir da classe de maior frequência.</p>
+<p class="narra">Na aula, você vai ver a moda surgir num gráfico, classificar conjuntos, mexer nas frequências e ver a moda estimada se deslocar dentro da classe, separar vantagens e limitações e encontrar a moda dos seus próprios dados, sejam números ou palavras. Vamos começar?</p>
+      </div></details>
+    </div>
+    <div class="citacao">A moda é a medida que indica o valor de maior frequência em um conjunto de dados.<small>TRIOLA, 2017</small></div>
+    <p>Esta é a primeira medida de tendência central do curso. Ao final da lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Encontrar a moda de dados quantitativos e qualitativos</li>
+      <li><span class="n">2</span>Classificar um conjunto em unimodal, bimodal, multimodal ou amodal</li>
+      <li><span class="n">3</span>Estimar a moda de dados agrupados pela fórmula de Czuber</li>
+      <li><span class="n">4</span>Avaliar as vantagens e as limitações da moda</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Qual valor mais se repete?</h2>
+    <p>Explore as três situações.</p>
+    <div class="abas">
+      <button class="on" data-aba="a1">Idades da turma</button>
+      <button data-aba="a2">Cor preferida</button>
+      <button data-aba="a3">Dias de exercício</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Vinte estudantes informaram a idade. Para descobrir a idade mais frequente, basta contar cada valor. Vamos fazer isso juntos na próxima seção.</p>
+      <div class="fichas" id="fichasIdades"></div>
+    </div>
+    <div class="painel" id="a2">
+      <p>Em uma pesquisa com 30 pessoas, a cor preferida foi: <b>azul, 12; verde, 8; vermelho, 6; amarelo, 4.</b></p>
+      <p>Qual é a cor mais escolhida? Resposta imediata: o <b>azul</b>. Repare que aqui não faz sentido calcular uma média de cores. Para dados qualitativos, a moda é muitas vezes a única medida de resumo aplicável.</p>
+      <div id="graficoCores"></div>
+    </div>
+    <div class="painel" id="a3">
+      <p>Oito pessoas informaram quantos dias por semana praticam exercícios:</p>
+      <div class="fichas"><span class="ficha">1</span><span class="ficha">1</span><span class="ficha">1</span><span class="ficha">3</span><span class="ficha">3</span><span class="ficha">3</span><span class="ficha">5</span><span class="ficha">6</span></div>
+      <p>Os valores 1 e 3 aparecem três vezes cada, e nenhum outro tem a mesma frequência. O conjunto tem <b>duas modas</b>. Dizer que “a moda é 1” esconderia metade da história.</p>
+      <div id="graficoDias"></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. CONTAGEM -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Na prática</div>
+    <h2>Encontrando a moda sem nenhuma fórmula</h2>
+    <p>Antes de contar, dê o seu palpite: qual idade você acha que mais se repete?</p>
+    <div class="palpites" id="palpites"></div>
+    <div id="palpiteMsg" class="fonte" style="min-height:22px"></div>
+    <div class="controles">
+      <button class="btn-sec" id="contUm">Contar próxima idade</button>
+      <button class="btn-sec" id="contTudo">Contar todas</button>
+      <button class="btn-sec" id="contReset">Recomeçar</button>
+    </div>
+    <div class="fichas" id="contFichas"></div>
+    <div id="contGrafico"></div>
+    <div id="contConclusao" style="display:none">
+      <p class="fonte">Figura 5 – Idades de 20 estudantes, com a moda (16 anos) destacada (dados fictícios). Fonte: elaboração do autor.</p>
+      <div class="citacao">A idade 16 aparece sete vezes; a 17, cinco; a 18, quatro; as demais, uma ou duas vezes. A moda é <b>16 anos</b>. Em um gráfico de barras, a moda é a barra mais alta.</div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3" data-trava="cont">Continuar</button><div class="dica-trava">Conte todas as idades para continuar</div></div>
+</section>
+
+<!-- 3. DEFINIÇÃO -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Definição</div>
+    <h2>A moda (Mo)</h2>
+    <div class="formula" style="font-size:19px">A <b>moda</b>, representada por <b>Mo</b>, é o valor do conjunto de dados que apresenta a maior frequência absoluta.</div>
+    <p>Clique nos cartões.</p>
+    <div class="cartoes">
+      <button class="cartao"><div class="giro"><div class="face frente">Para que tipo de variável?<small>Clique para virar</small></div><div class="face verso">Para qualquer tipo, qualitativa ou quantitativa, porque a moda depende apenas da contagem.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Qual a principal vantagem?<small>Clique para virar</small></div><div class="face verso">Ela não exige que os valores possam ser somados ou ordenados numericamente.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Como aparece no gráfico?<small>Clique para virar</small></div><div class="face verso">É a barra mais alta. Para destacá-la, use uma cor mais escura e deixe as demais em tom claro.</div></div></button>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4">Continuar</button></div>
+</section>
+
+<!-- 4. CLASSIFICAÇÃO -->
+<section class="secao" data-s="4">
+  <div class="bloco">
+    <div class="rotulo">Classificação quanto ao número de modas</div>
+    <h2>Uma, duas, várias ou nenhuma</h2>
+    <div class="tipos-moda">
+      <div><b>Unimodal</b><span>uma única moda</span></div>
+      <div><b>Bimodal</b><span>duas modas</span></div>
+      <div><b>Multimodal</b><span>mais de duas</span></div>
+      <div><b>Amodal</b><span>todos os valores com a mesma frequência</span></div>
+    </div>
+    <div class="acordeao">
+      <details><summary>Por que essa classificação importa?</summary><div class="corpo"><p>Um conjunto bimodal pode indicar dois grupos diferentes misturados, por exemplo, pessoas que treinam pouco e pessoas que treinam muito. Antes de concluir algo, convém investigar a origem dessas modas.</p></div></details>
+    </div>
+  </div>
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Atividade</div>
+    <h3>Arraste cada conjunto para a sua classificação</h3>
+    <p class="fonte">No celular, toque no conjunto e depois toque na coluna.</p>
+    <div class="dd-banco" id="dd1Banco"></div>
+    <div class="dd-zonas" id="dd1Zonas">
+      <div class="dd-zona" data-z="uni"><h4>Unimodal</h4></div>
+      <div class="dd-zona" data-z="bi"><h4>Bimodal</h4></div>
+      <div class="dd-zona" data-z="multi"><h4>Multimodal</h4></div>
+      <div class="dd-zona" data-z="amodal"><h4>Amodal</h4></div>
+    </div>
+    <div class="dd-msg" id="dd1Msg"></div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="5" data-trava="dd1">Continuar</button><div class="dica-trava">Classifique todos os conjuntos para continuar</div></div>
+</section>
+
+<!-- 5. CZUBER -->
+<section class="secao" data-s="5">
+  <div class="bloco">
+    <div class="rotulo">Moda em dados agrupados em classes</div>
+    <h2>A fórmula de Czuber</h2>
+    <p>Quando os dados estão agrupados em classes, como na Lição 2, não temos mais os valores individuais. Usamos a <b>classe modal</b>, a classe de maior frequência absoluta, e estimamos a moda dentro dela.</p>
+    <div class="formula" style="font-size:19px;text-align:center">Mo = l + [ Δ₁ / (Δ₁ + Δ₂) ] · h<br><small style="font-size:14px;color:var(--texto)">Δ₁ = f<sub>mo</sub> − f<sub>ant</sub> &nbsp;·&nbsp; Δ₂ = f<sub>mo</sub> − f<sub>post</sub> &nbsp;·&nbsp; l = limite inferior da classe modal &nbsp;·&nbsp; h = amplitude</small></div>
+    <p>Acompanhe o cálculo com o consumo mensal de energia de 23 residências (Tabela 4).</p>
+    <table class="freq" id="tab4"></table>
+    <p class="fonte">Tabela 4 – Consumo mensal de energia de 23 residências, em kWh (dados fictícios). Fonte: elaboração do autor.</p>
+    <div class="passos" id="passos">
+      <span class="etq" id="passoEtq">Passo 1</span>
+      <div class="passo on" data-real="1"><h3>Encontre a classe modal</h3><p>A classe de maior frequência é <b>[150; 200)</b>, com f = 10. Então l = 150 e h = 50.</p></div>
+      <div class="passo" data-real="2"><h3>Olhe as vizinhas</h3><p>A classe anterior, [100; 150), tem f = 4. A posterior, [200; 250), tem f = 6.</p></div>
+      <div class="passo" data-real="2"><h3>Calcule Δ₁ e Δ₂</h3><div class="formula">Δ₁ = 10 − 4 = 6 &nbsp;&nbsp;·&nbsp;&nbsp; Δ₂ = 10 − 6 = 4</div></div>
+      <div class="passo" data-real="3"><h3>Aplique a fórmula</h3><div class="formula">Mo = 150 + [6 / (6 + 4)] · 50 = 150 + 30 = <b>180 kWh</b></div><p>A moda estimada é 180 kWh.</p></div>
+      <button class="seta esq" id="pAnt" aria-label="Passo anterior" disabled>‹</button>
+      <button class="seta dir" id="pProx" aria-label="Próximo passo">›</button>
+      <div class="pontos" id="pPontos"><span class="on">1</span><span>2</span><span>3</span><span>4</span></div>
+    </div>
+    <div id="czGrafico" style="margin-top:20px"></div>
+    <div class="acordeao">
+      <details><summary>Atenção: é uma estimativa</summary><div class="corpo"><p>A fórmula supõe que os valores se distribuem de forma aproximadamente uniforme dentro da classe modal. Vale verificar a formulação e as hipóteses na bibliografia antes de aplicá-la em trabalhos formais.</p></div></details>
+    </div>
+  </div>
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Experimente</div>
+    <h3>Para onde a moda se desloca?</h3>
+    <p>Mude as frequências das classes vizinhas e veja a moda estimada se mover dentro da classe modal [150; 200), que continua com f = 10.</p>
+    <div class="painel-calc">
+      <label>Classe anterior [100; 150): f<sub>ant</sub> = <b id="fAntV">4</b></label>
+      <input type="range" id="fAnt" min="0" max="9" value="4">
+      <label>Classe posterior [200; 250): f<sub>post</sub> = <b id="fPostV">6</b></label>
+      <input type="range" id="fPost" min="0" max="9" value="6">
+      <div class="caixas">
+        <div class="caixa"><span>Δ₁ = 10 − f<sub>ant</sub></span><b id="d1">6</b></div>
+        <div class="caixa"><span>Δ₂ = 10 − f<sub>post</sub></span><b id="d2">4</b></div>
+        <div class="caixa destaque-cx"><span>Moda estimada</span><b id="moV">180 kWh</b></div>
+      </div>
+      <div id="czRegua"></div>
+      <p class="fonte" id="czMsg"></p>
+    </div>
+  </div></div>
+  <div class="bloco" style="padding-top:20px">
+    <div class="questao" data-q="cz">
+      <div class="enunciado">Consumo mensal de água de 25 unidades: [10; 14) com 4; [14; 18) com 9; [18; 22) com 7; [22; 26) com 5. Qual é a moda estimada pela fórmula de Czuber?</div>
+      <button class="opcao"><span class="radio"></span>16 m³ (o ponto médio da classe modal)</button>
+      <button class="opcao" data-certa><span class="radio"></span>Cerca de 16,86 m³</button>
+      <button class="opcao"><span class="radio"></span>Cerca de 18,57 m³</button>
+      <button class="opcao"><span class="radio"></span>9 m³</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. Classe modal [14; 18): l = 14, h = 4. Δ₁ = 9 − 4 = 5 e Δ₂ = 9 − 7 = 2. Mo = 14 + (5/7) · 4 ≈ 14 + 2,86 = 16,86 m³, um valor aproximado, em torno de 16,9 m³." data-nao="Não é essa. A classe modal é [14; 18), com l = 14 e h = 4. Δ₁ = 9 − 4 = 5 e Δ₂ = 9 − 7 = 2. Mo = 14 + [5 / (5 + 2)] · 4 ≈ 16,86 m³. Repare que 9 é a frequência, não a moda."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="6" data-trava="cz">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 6. VANTAGENS E LIMITAÇÕES -->
+<section class="secao" data-s="6">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Vantagens e limitações</div>
+    <h2>A moda raramente deve ser usada sozinha</h2>
+    <p>Arraste cada característica para a coluna certa.</p>
+    <p class="fonte">No celular, toque na característica e depois toque na coluna.</p>
+    <div class="dd-banco" id="dd2Banco"></div>
+    <div class="dd-zonas" id="dd2Zonas" style="grid-template-columns:1fr 1fr">
+      <div class="dd-zona" data-z="v"><h4>✓ Vantagem</h4></div>
+      <div class="dd-zona" data-z="l"><h4>⚠ Limitação</h4></div>
+    </div>
+    <div class="dd-msg" id="dd2Msg"></div>
+    <div class="citacao" id="vlConc" style="display:none">A moda considera apenas o valor mais frequente, e não a distribuição como um todo. Ela ganha força quando acompanhada de outras medidas, como a média e a mediana, que veremos nas próximas lições.</div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="7" data-trava="dd2">Continuar</button><div class="dica-trava">Classifique todas as características para continuar</div></div>
+</section>
+
+<!-- 7. LABORATÓRIO -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">A moda dos seus dados, números ou palavras</h3>
+      <p>Digite os valores separados por vírgula: números (como 2, 3, 3, 5) ou palavras (como azul, verde, azul). A aula conta, destaca a moda no gráfico e classifica o conjunto.</p>
+    </div>
+    <div style="margin-top:20px">
+      <textarea id="labDados" rows="3" placeholder="Ex.: branco, preto, prata, branco, preto, prata, vermelho, azul, azul"></textarea>
+      <div class="erro-txt" id="labErro"></div>
+      <div class="controles">
+        <button class="btn-sec" id="labGerar">Encontrar a moda</button>
+        <button class="btn-sec" id="labEx1">Exemplo: gols em 10 jogos</button>
+        <button class="btn-sec" id="labEx2">Exemplo: cores de carros</button>
+      </div>
+      <div id="labRes"></div>
+      <div id="labGrafico"></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8">Continuar</button></div>
+</section>
+
+<!-- 8. RESUMO -->
+<section class="secao" data-s="8">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="cartoes quatro">
+      <button class="cartao"><div class="giro"><div class="face frente">O que é a moda<small>Clique para virar</small></div><div class="face verso">O valor de maior frequência. Vale para variáveis qualitativas e quantitativas.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Quantas modas<small>Clique para virar</small></div><div class="face verso">Unimodal, bimodal, multimodal ou amodal.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Dados agrupados<small>Clique para virar</small></div><div class="face verso">Estimada a partir da classe modal pela fórmula de Czuber; o resultado é aproximado.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Usar com cuidado<small>Clique para virar</small></div><div class="face verso">Simples e robusta a valores extremos, mas considera só um valor: raramente deve ser usada sozinha.</div></div></button>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="9">Ir para o quiz</button></div>
+</section>
+
+<!-- 9. QUIZ -->
+<section class="secao" data-s="9">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 4 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões sobre o Capítulo 4, a maioria tirada dos exercícios do livro.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=10, CHAVE="decastro-estat-l4", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+var LAR="#E4572E", CLARO="#F6B9A4", ESC="#C2421D";
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao")), aoAbrir={};
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); if(aoAbrir[n]) aoAbrir[n](); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* gráfico de barras com moda destacada */
+function passoBonito(x){ if(x<=1) return 1; var p=Math.pow(10,Math.floor(Math.log10(x))), r=x/p; return (r<=1?1:r<=2?2:r<=5?5:10)*p; }
+function barrasModa(dados,o){
+  o=o||{}; var W=o.W||560,H=o.H||290,m={l:44,r:16,t:26,b:52}, iw=W-m.l-m.r, ih=H-m.t-m.b;
+  var mx=Math.max(1,Math.max.apply(null,dados.map(function(d){return d[1];}))), passo=passoBonito(mx/5), yMax=Math.ceil(mx/passo)*passo; if(o.destacar&&yMax-mx<passo*0.6) yMax+=passo;
+  var todasIguais=dados.length>1&&dados.every(function(d){return d[1]===dados[0][1];});
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Gráfico de barras com a moda destacada">'];
+  for(var k=0;k<=yMax;k+=passo){ var y=m.t+ih-ih*k/yMax; s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" stroke="#E4E7EB"/><text x="'+(m.l-8)+'" y="'+(y+4)+'" font-size="12" text-anchor="end" fill="#7B8794">'+k+'</text>'); }
+  var bw=iw/dados.length;
+  dados.forEach(function(d,i){ var h=ih*d[1]/yMax, x=m.l+i*bw+bw*.18, w=bw*.64, moda=o.destacar&&!todasIguais&&d[1]===mx&&mx>0;
+    s.push('<rect x="'+x+'" y="'+(m.t+ih-h)+'" width="'+w+'" height="'+h+'" fill="'+(o.destacar?(moda?ESC:CLARO):LAR)+'" rx="2"><title>'+d[0]+': '+d[1]+'</title></rect>');
+    if(d[1]>0) s.push('<text x="'+(x+w/2)+'" y="'+(m.t+ih-h-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">'+d[1]+'</text>');
+    if(moda) s.push('<text x="'+(x+w/2)+'" y="'+(m.t+ih-h-22)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+ESC+'">MODA</text>');
+    s.push('<text x="'+(x+w/2)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+d[0]+'</text>'); });
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+(m.t+ih)+'" y2="'+(m.t+ih)+'" stroke="#9AA5B1"/>');
+  if(o.eixoX) s.push('<text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">'+o.eixoX+'</text>');
+  s.push('<text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">Frequência (f)</text></svg>');
+  return s.join("");
+}
+document.getElementById("graficoCores").innerHTML=barrasModa([["Azul",12],["Verde",8],["Vermelho",6],["Amarelo",4]],{destacar:true,eixoX:"Cor preferida"});
+document.getElementById("graficoDias").innerHTML=barrasModa([["1",3],["2",0],["3",3],["4",0],["5",1],["6",1]],{destacar:true,eixoX:"Dias de exercício por semana"});
+
+/* contagem das idades */
+var IDADES=[16,17,16,18,17,16,19,16,17,18,16,20,17,16,18,21,17,16,19,18], VALS=[16,17,18,19,20,21];
+document.getElementById("fichasIdades").innerHTML=IDADES.map(function(v){return '<span class="ficha">'+v+'</span>';}).join("");
+var pal=document.getElementById("palpites"), palpite=null;
+VALS.forEach(function(v){ var b=document.createElement("button"); b.className="btn-sec"; b.textContent=v+" anos"; b.addEventListener("click", function(){ palpite=v; pal.querySelectorAll("button").forEach(function(x){x.classList.remove("on-p");}); b.classList.add("on-p"); document.getElementById("palpiteMsg").textContent="Palpite registrado: "+v+" anos. Agora conte e confira."; }); pal.appendChild(b); });
+var pos=0, cont={}, cF=document.getElementById("contFichas");
+cF.innerHTML=IDADES.map(function(v){return '<span class="ficha">'+v+'</span>';}).join("");
+function desenharCont(){
+  var fim=pos>=IDADES.length;
+  document.getElementById("contGrafico").innerHTML=barrasModa(VALS.map(function(v){return [String(v),cont[v]||0];}),{destacar:fim,eixoX:"Idade (anos)"});
+  document.getElementById("contConclusao").style.display=fim?"block":"none";
+  document.getElementById("contUm").disabled=document.getElementById("contTudo").disabled=fim;
+  if(fim){ liberar("cont"); if(palpite!==null) document.getElementById("palpiteMsg").textContent = palpite===16 ? "Seu palpite estava certo: 16 anos!" : "Seu palpite foi "+palpite+" anos; a moda é 16 anos."; }
+}
+function contarUm(){ if(pos>=IDADES.length) return; var f=cF.querySelectorAll(".ficha"), v=IDADES[pos]; f.forEach(function(x){x.classList.remove("destaque");}); f[pos].classList.add("destaque"); (function(j){ setTimeout(function(){ f[j].classList.remove("destaque"); f[j].classList.add("contada"); },500); })(pos); cont[v]=(cont[v]||0)+1; pos++; desenharCont(); }
+document.getElementById("contUm").addEventListener("click", contarUm);
+document.getElementById("contTudo").addEventListener("click", function(){ this.disabled=true; var t=setInterval(function(){ if(pos>=IDADES.length){clearInterval(t);return;} contarUm(); },250); });
+document.getElementById("contReset").addEventListener("click", function(){ pos=0; cont={}; cF.querySelectorAll(".ficha").forEach(function(f){f.className="ficha";}); desenharCont(); });
+desenharCont();
+
+/* arrastar e soltar genérico */
+function montarDD(pref, itens, expl, msgErro, trava, aoFim){
+  var banco=document.getElementById(pref+"Banco"), zonas=document.querySelectorAll("#"+pref+"Zonas .dd-zona"), msg=document.getElementById(pref+"Msg"), rest=itens.length, sel=null;
+  itens.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; if(it[2]) d.dataset.x=it[2]; banco.appendChild(d); ligar(d); });
+  function soltar(item,zona){ if(!zona) return;
+    if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent="Correto"+(item.dataset.x?": "+item.dataset.x:(expl[item.dataset.z]?": "+expl[item.dataset.z]:""))+"."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Tudo no lugar certo."; liberar(trava); if(aoFim) aoFim(); } }
+    else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent=msgErro; } }
+  function zonaEm(x,y){ var el=document.elementFromPoint(x,y); el=el?el.closest(".dd-zona"):null; return el&&el.parentNode.id===pref+"Zonas"?el:null; }
+  function ligar(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+    el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+      if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+      f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+    el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+      if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+      else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+  }
+  zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+}
+montarDD("dd1",[
+  ["Idades: 16 aparece 7 vezes, 17 cinco vezes, 18 quatro vezes…","uni","só o 16 tem a maior frequência"],
+  ["Gols em 10 jogos: 0, 1, 2, 2, 3, 1, 2, 4, 2, 1","uni","só o 2 aparece quatro vezes"],
+  ["Dias de exercício: 1, 1, 1, 3, 3, 3, 5, 6","bi","1 e 3 aparecem três vezes cada"],
+  ["Cores: branco, preto, prata, branco, preto, prata, vermelho, azul, azul","multi","branco, preto, prata e azul aparecem duas vezes cada"],
+  ["Valores 2, 4, 6, 8, cada um uma única vez","amodal","nenhum valor se destaca"]
+],{}, "Ainda não. Conte quantos valores têm a maior frequência.", "dd1");
+montarDD("dd2",[
+  ["Simples de entender e de calcular","v"],["Aplica-se a dados qualitativos, como cores","v"],["Não é afetada por valores extremos","v"],
+  ["Pode não existir (conjunto amodal)","l"],["Pode haver várias modas","l"],["Depende do agrupamento em classes nos dados contínuos","l"],["Considera só o valor mais frequente, não a distribuição inteira","l"]
+],{}, "Ainda não. Pense se a característica ajuda ou atrapalha a descrição dos dados.", "dd2", function(){ document.getElementById("vlConc").style.display="block"; });
+
+/* Czuber: tabela, passos, gráfico, simulador */
+var T4=[[100,150,4,"Classe anterior"],[150,200,10,"Classe modal"],[200,250,6,"Classe posterior"],[250,300,3,"—"]];
+document.getElementById("tab4").innerHTML='<tr><th>Classe (kWh)</th><th>f</th><th>Observação</th></tr>'+T4.map(function(c,i){return '<tr'+(i===1?' class="pisca"':'')+'><td>['+c[0]+'; '+c[1]+')</td><td>'+c[2]+'</td><td>'+c[3]+'</td></tr>';}).join("")+'<tr class="total"><td>Total</td><td>23</td><td>—</td></tr>';
+function histCz(fa,fp,real){
+  var cl=[[100,150,fa],[150,200,10],[200,250,fp],[250,300,3]], W=560,H=300,m={l:44,r:16,t:30,b:52}, iw=W-m.l-m.r, ih=H-m.t-m.b, yMax=12;
+  function X(v){return m.l+iw*(v-100)/200;} function Y(v){return m.t+ih-ih*v/yMax;}
+  var d1=10-fa, d2=10-fp, mo=150+(d1+d2>0?d1/(d1+d2):.5)*50;
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Histograma com a moda estimada">'];
+  for(var k=0;k<=yMax;k+=2){ var y=Y(k); s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" stroke="#E4E7EB"/><text x="'+(m.l-8)+'" y="'+(y+4)+'" font-size="12" text-anchor="end" fill="#7B8794">'+k+'</text>'); }
+  cl.forEach(function(c,i){ s.push('<rect x="'+X(c[0])+'" y="'+Y(c[2])+'" width="'+(X(c[1])-X(c[0]))+'" height="'+(Y(0)-Y(c[2]))+'" fill="'+(i===1?LAR:CLARO)+'" stroke="#fff" stroke-width="1.5"/><text x="'+(X(c[0])+X(c[1]))/2+'" y="'+(Y(c[2])-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">'+c[2]+'</text>'); });
+  [100,150,200,250,300].forEach(function(v){ s.push('<text x="'+X(v)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+v+'</text>'); });
+  s.push('<line x1="'+X(mo)+'" x2="'+X(mo)+'" y1="'+(m.t-6)+'" y2="'+Y(0)+'" stroke="#1F2933" stroke-width="2.5" stroke-dasharray="6 4"/><text x="'+X(mo)+'" y="'+(m.t-12)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">Mo ≈ '+br(mo,1).replace(",0","")+' kWh</text>');
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="#9AA5B1"/><text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">Consumo mensal (kWh)</text><text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">Frequência (f)</text></svg>');
+  return s.join("");
+}
+document.getElementById("czGrafico").innerHTML=histCz(4,6);
+var passoAt=0, passos=document.querySelectorAll(".passo"), pontos=document.querySelectorAll("#pPontos span");
+function irPasso(n){ passoAt=n; passos.forEach(function(p,i){p.classList.toggle("on",i===n);}); pontos.forEach(function(p,i){p.classList.toggle("on",i===n);}); document.getElementById("passoEtq").textContent="Passo "+(n+1); document.getElementById("pAnt").disabled=n===0; document.getElementById("pProx").disabled=n===passos.length-1; }
+document.getElementById("pAnt").addEventListener("click", function(){ irPasso(Math.max(0,passoAt-1)); });
+document.getElementById("pProx").addEventListener("click", function(){ irPasso(Math.min(passos.length-1,passoAt+1)); });
+pontos.forEach(function(p,i){ p.style.cursor="pointer"; p.addEventListener("click", function(){irPasso(i);}); });
+var fA=document.getElementById("fAnt"), fP=document.getElementById("fPost");
+function simular(){
+  var a=+fA.value, p=+fP.value, d1=10-a, d2=10-p, mo=150+d1/(d1+d2)*50;
+  document.getElementById("fAntV").textContent=a; document.getElementById("fPostV").textContent=p;
+  document.getElementById("d1").textContent=d1; document.getElementById("d2").textContent=d2;
+  document.getElementById("moV").textContent=br(mo,1).replace(",0","")+" kWh";
+  document.getElementById("czRegua").innerHTML=histCz(a,p);
+  document.getElementById("czMsg").textContent = a===p ? "Vizinhas iguais: a moda fica exatamente no meio da classe modal, em 175 kWh." : (a>p ? "A classe anterior é mais alta: a moda se desloca para a esquerda, na direção dela." : "A classe posterior é mais alta: a moda se desloca para a direita, na direção dela.");
+}
+fA.addEventListener("input", simular); fP.addEventListener("input", simular); simular();
+
+/* laboratório */
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var txt=document.getElementById("labDados").value.trim();
+  var partes=(txt.indexOf(",")>=0||txt.indexOf(";")>=0 ? txt.split(/[,;\n]+/) : txt.split(/\s+/)).map(function(x){return x.trim();}).filter(Boolean);
+  if(partes.length<2){ erro.textContent="Digite pelo menos dois valores, separados por vírgula."; return; }
+  if(partes.length>500){ erro.textContent="Use no máximo 500 valores."; return; }
+  var numerico=partes.every(function(x){return /^-?\d+([.]\d+)?$/.test(x);});
+  var c={}, ordem=[]; partes.forEach(function(x){ var k=numerico?String(Number(x)):x.toLowerCase(); if(!(k in c)){c[k]=0;ordem.push(k);} c[k]++; });
+  var chaves=numerico?ordem.slice().sort(function(a,b){return a-b;}):ordem.slice().sort(function(a,b){return c[b]-c[a]||a.localeCompare(b,"pt");});
+  if(chaves.length>20){ erro.textContent="Há "+chaves.length+" valores diferentes. Para dados contínuos com muitos valores distintos, agrupe em classes (Lição 2) e use a fórmula de Czuber."; return; }
+  var mx=Math.max.apply(null,chaves.map(function(k){return c[k];})), modas=chaves.filter(function(k){return c[k]===mx;});
+  var tipo, txtM;
+  if(modas.length===chaves.length&&chaves.length>1){ tipo="amodal"; txtM="Todos os valores aparecem "+mx+(mx>1?" vezes":" vez")+": não há moda."; }
+  else { tipo=modas.length===1?"unimodal":modas.length===2?"bimodal":"multimodal"; txtM=(modas.length===1?"A moda é ":"As modas são ")+'<b>'+modas.join(", ")+'</b>, com frequência '+mx+'.'; }
+  document.getElementById("labRes").innerHTML='<div class="caixas"><div class="caixa"><span>Observações</span><b>'+partes.length+'</b></div><div class="caixa"><span>Valores diferentes</span><b>'+chaves.length+'</b></div><div class="caixa destaque-cx"><span>Classificação</span><b>'+tipo+'</b></div></div><p style="margin-top:10px">'+txtM+(numerico?"":" Como os dados são qualitativos, a moda é a medida de resumo natural.")+'</p>';
+  document.getElementById("labGrafico").innerHTML=barrasModa(chaves.map(function(k){return [k.slice(0,12),c[k]];}),{destacar:true});
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.getElementById("labEx1").addEventListener("click", function(){ document.getElementById("labDados").value="0, 1, 2, 2, 3, 1, 2, 4, 2, 1"; lab(); });
+document.getElementById("labEx2").addEventListener("click", function(){ document.getElementById("labDados").value="branco, preto, prata, branco, preto, prata, vermelho, azul, azul"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"Em 10 jogos, um time marcou 0, 1, 2, 2, 3, 1, 2, 4, 2 e 1 gols. Qual é a moda e como se classifica o conjunto?", o:["Moda 1; unimodal","Moda 2; unimodal","Modas 1 e 2; bimodal","Não há moda; amodal"], c:1, x:"O 2 aparece quatro vezes; o 1, três; os demais, uma vez. A moda é 2 gols, e o conjunto é unimodal."},
+ {e:"Cores de nove carros: branco, preto, prata, branco, preto, prata, vermelho, azul e azul. Como se classifica o conjunto?", o:["Unimodal, moda branco","Bimodal","Multimodal, com quatro modas","Amodal"], c:2, x:"Branco, preto, prata e azul aparecem duas vezes cada; vermelho, uma vez. São quatro modas: o conjunto é multimodal."},
+ {e:"Um clube consultou 40 associados: futebol, 18; vôlei, 9; natação, 8; tênis, 5. Por que não se usa a média aqui?", o:["Porque há poucos associados","Porque o esporte é uma variável qualitativa nominal: as categorias não podem ser somadas","Porque a moda e a média seriam iguais","Porque o futebol tem frequência muito alta"], c:1, x:"A moda é o futebol. Calcular uma média entre futebol e vôlei não faz sentido: as categorias não têm ordem numérica nem podem ser somadas."},
+ {e:"Na fórmula de Czuber, se as classes anterior e posterior à classe modal tiverem a mesma frequência, onde fica a moda estimada?", o:["No limite inferior da classe modal","No ponto médio da classe modal","No limite superior da classe modal","Fora da classe modal"], c:1, x:"Com f_ant = f_post, Δ₁ = Δ₂ e a fração Δ₁/(Δ₁+Δ₂) vale 1/2: a moda fica no meio da classe modal."},
+ {e:"Um gerente diz: “O tempo de atendimento mais comum é 3 minutos, registrado em 40% dos atendimentos; portanto, o atendimento normalmente leva 3 minutos.” O que está correto?", o:["Tudo: a moda sempre representa o conjunto","Só que 3 minutos é o valor mais frequente; os outros 60% podem ser bem diferentes","Nada: a moda não pode ser usada para tempos","A moda deveria ser 40%"], c:1, x:"A moda descreve apenas o valor mais frequente, não o perfil completo. Para uma descrição fiel, é preciso examinar a distribuição inteira e medidas como a média e a mediana."}
+];
+var qi=0, ac=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+ac+'/'+QUIZ.length+'</div><p>'+(ac>=4?"Excelente! Você está pronto para a Lição 5.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;ac=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+ac+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) ac++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

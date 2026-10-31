@@ -1,0 +1,36 @@
+CURSO ESTATÍSTICA DESCRITIVA – DeCastro
+=======================================
+
+ARQUIVOS
+  index.html                Abre o painel
+  painel.html               Painel do curso (entrada por código + lista das 13 aulas)
+  aula-00.html … aula-12.html  As 13 aulas
+  narracao.json + gerar_audio.py  Roteiro e script para gerar os MP3 (voz Francisca)
+
+0) EXTRAIA O ZIP ANTES DE ABRIR
+   Clique com o botão direito no ZIP > Extrair tudo. Abrir as páginas direto de dentro
+   do ZIP faz o Windows copiar só um arquivo para uma pasta temporária, e os links
+   entre as aulas não funcionam.
+
+1) DEFINA O CÓDIGO DO LIVRO
+   Abra painel.html num editor de texto (Bloco de Notas, VS Code) e troque a linha:
+       CODIGO_ACESSO: "ESTAT-DEMO",
+   pelo código do livro Estatística Descritiva.
+
+2) GERE OS ÁUDIOS (opcional, recomendado)
+   pip install edge-tts
+   python gerar_audio.py
+   Isso cria a pasta "audio" com os MP3. Sem ela, as aulas usam a voz do navegador.
+
+3) PUBLIQUE
+   Envie tudo (incluindo a pasta audio) para um repositório no GitHub, por exemplo
+   luizdecaxtro/curso-estatistica-descritiva, e ative o GitHub Pages.
+   O endereço do painel será .../curso-estatistica-descritiva/ (index.html).
+   No site da Locaweb, incorpore esse endereço por iframe, como nos outros apps.
+
+OBSERVAÇÕES
+ - Quem abrir uma aula sem o código é levado ao painel e volta à aula depois de entrar.
+ - O progresso fica salvo no navegador de cada aluno (chaves "decastro_estat_..."),
+   sem conflito com o curso Gerenciamento Empresarial.
+ - Como o site é estático, o código pode ser visto por quem inspecionar painel.html.
+ - Se o navegador bloquear o armazenamento, o acesso vale enquanto a aba estiver aberta.

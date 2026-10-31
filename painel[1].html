@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estatística Descritiva – Painel do curso | DeCastro</title>
+<meta name="description" content="Curso complementar do livro Estatística Descritiva: digite o código de acesso do seu livro e acesse as 13 aulas interativas.">
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: "ESTAT-DEMO", // <<< troque pelo código do livro
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;font-family:var(--sans);color:var(--texto);background:var(--fundo)}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit}
+.topo{background:#fff;border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:10}
+.topo .in{max-width:1080px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:14px}
+.marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+.topo .tit{font-family:var(--serif);font-size:18px;color:var(--tinta)}
+.topo .esp{flex:1}
+.btn-sair{background:none;border:1px solid var(--linha);border-radius:20px;padding:7px 16px;font-size:13px;color:var(--texto)}
+.btn-sair:hover{border-color:var(--laranja);color:var(--laranja)}
+
+/* entrada */
+.entrada{min-height:calc(100vh - 54px);display:grid;grid-template-columns:1.1fr 1fr}
+.entrada .lado-a{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:70px 56px;display:flex;flex-direction:column;justify-content:center}
+.entrada .lado-a .rot{color:#FFB199;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.entrada h1{font-family:var(--serif);font-weight:normal;font-size:44px;line-height:1.15;margin:12px 0 6px}
+.entrada .sub{font-family:var(--serif);font-size:20px;color:#CBD2D9;margin:0 0 28px}
+.entrada ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.entrada li{display:flex;gap:12px;align-items:flex-start;font-size:15px;color:#E4E7EB}
+.entrada li b{flex:0 0 28px;height:28px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+.entrada .lado-b{display:flex;align-items:center;justify-content:center;padding:40px 24px;background:#fff}
+.cartao-entrada{width:100%;max-width:380px}
+.cartao-entrada h2{font-family:var(--serif);font-weight:normal;color:var(--tinta);font-size:28px;margin:0 0 10px}
+.cartao-entrada p{line-height:1.6;margin:0 0 20px}
+#formCodigo{display:flex;flex-direction:column;gap:10px}
+#campoCodigo{width:100%;padding:14px;border-radius:8px;border:1px solid var(--linha);font-size:20px;font-family:inherit;letter-spacing:3px;text-align:center;text-transform:uppercase}
+#campoCodigo:focus{outline:2px solid var(--laranja);outline-offset:1px;border-color:transparent}
+.btn-prim{background:var(--laranja);color:#fff;border:0;border-radius:8px;padding:14px;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;display:inline-block;text-align:center}
+.btn-prim:hover{background:var(--laranja-esc)}
+.erro{color:var(--vermelho);font-size:14px;min-height:20px;text-align:center}
+.ajuda{font-size:13px;color:var(--cinza);text-align:center;line-height:1.6;margin-top:18px}
+.ajuda a{color:var(--laranja);font-weight:700}
+
+/* painel */
+.painel{max-width:1080px;margin:0 auto;padding:32px 24px 60px}
+.hero{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;border-radius:12px;padding:34px 36px;display:grid;grid-template-columns:1fr auto;gap:26px;align-items:center}
+.hero .rot{color:#FFB199;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700}
+.hero h1{font-family:var(--serif);font-weight:normal;font-size:34px;margin:8px 0 4px}
+.hero p{margin:0 0 20px;color:#CBD2D9;font-size:15px}
+.hero .autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-bottom:22px}
+.hero .autor b{width:32px;height:32px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:12px}
+.anel{width:150px;height:150px;position:relative}
+.anel svg{transform:rotate(-90deg)}
+.anel .val{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.anel .val b{font-family:var(--serif);font-size:34px;font-weight:normal;display:block}
+.anel .val span{font-size:11px;color:#CBD2D9;letter-spacing:.06em;text-transform:uppercase}
+.resumo{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 6px}
+.resumo div{background:#fff;border-radius:8px;padding:16px;text-align:center;border:1px solid var(--linha)}
+.resumo b{display:block;font-family:var(--serif);font-size:26px;color:var(--tinta);font-weight:normal}
+.resumo span{font-size:12px;color:var(--cinza)}
+.bloco{margin-top:34px}
+.bloco h2{display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:normal;color:var(--tinta);font-size:22px;margin:0 0 14px}
+.bloco h2 .nb{width:30px;height:30px;border-radius:50%;background:var(--tinta);color:#fff;display:grid;place-items:center;font-family:var(--sans);font-size:13px;font-weight:700}
+.bloco h2 small{font-family:var(--sans);font-size:12px;color:var(--cinza);font-weight:normal;margin-left:auto}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.aula{display:flex;flex-direction:column;background:#fff;border:1px solid var(--linha);border-radius:10px;padding:18px 18px 16px;text-decoration:none;color:var(--texto);transition:transform .15s, box-shadow .15s, border-color .15s;position:relative;overflow:hidden}
+.aula:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.08);border-color:var(--laranja)}
+.aula .cab{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.aula .num{flex:0 0 40px;height:40px;border-radius:50%;background:var(--laranja-claro);color:var(--laranja-esc);display:grid;place-items:center;font-weight:700}
+.aula.feita .num{background:var(--verde);color:#fff}
+.aula.andamento .num{background:var(--laranja);color:#fff}
+.aula .tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}
+.aula.feita .tag{color:var(--verde)}
+.aula.andamento .tag{color:var(--laranja)}
+.aula h3{font-family:var(--serif);font-weight:normal;color:var(--tinta);font-size:19px;line-height:1.3;margin:0 0 6px}
+.aula p{font-size:13px;margin:0 0 14px;line-height:1.5;flex:1}
+.aula .barra{height:5px;background:var(--linha);border-radius:3px;overflow:hidden}
+.aula .barra i{display:block;height:100%;background:var(--laranja);border-radius:3px}
+.aula.feita .barra i{background:var(--verde)}
+.aula .rod{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px}
+.aula .rod .ir{font-weight:700;color:var(--laranja)}
+.aula.destaque{border:2px solid var(--laranja);box-shadow:0 8px 22px rgba(228,87,46,.15)}
+.aula.destaque::before{content:"CONTINUE AQUI";position:absolute;top:12px;right:-30px;transform:rotate(35deg);background:var(--laranja);color:#fff;font-size:9px;font-weight:700;letter-spacing:.08em;padding:3px 34px}
+.rodape{margin-top:46px;padding-top:22px;border-top:1px solid var(--linha);display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between;font-size:13px;color:var(--cinza)}
+.rodape a{color:var(--laranja);font-weight:700;text-decoration:none}
+.aviso{background:#fff;border-left:4px solid var(--laranja);border-radius:0 6px 6px 0;padding:12px 16px;font-size:13px;margin-top:18px}
+@media (max-width:860px){
+  .entrada{grid-template-columns:1fr}
+  .entrada .lado-a{padding:40px 24px}
+  .entrada h1{font-size:32px}
+  .hero{grid-template-columns:1fr;padding:26px 22px}
+  .hero h1{font-size:28px}
+  .anel{margin:0 auto}
+  .topo .tit{display:none}
+  .resumo{grid-template-columns:1fr 1fr 1fr}
+  .resumo b{font-size:20px}
+  .grade{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="topo"><div class="in">
+  <div><div class="marca">DeCastro · O Canal do Conhecimento</div></div>
+  <div class="tit">Estatística Descritiva</div>
+  <div class="esp"></div>
+  <div id="areaSair"></div>
+</div></header>
+
+<!-- ENTRADA -->
+<section class="entrada" id="telaEntrada" hidden>
+  <div class="lado-a">
+    <div class="rot">Curso complementar do livro</div>
+    <h1>Estatística Descritiva</h1>
+    <p class="sub">Aprendendo com a vida real · Luiz de Castro</p>
+    <ul>
+      <li><b>13</b>aulas interativas: uma introdutória e uma para cada capítulo do livro</li>
+      <li><b>🎧</b>Introdução em áudio no início de cada aula</li>
+      <li><b>✋</b>Atividades de arrastar, simulações, laboratório com os seus dados e quiz</li>
+      <li><b>📱</b>No computador, no tablet ou no celular, com o progresso salvo</li>
+    </ul>
+  </div>
+  <div class="lado-b">
+    <div class="cartao-entrada">
+      <h2>Acesse o curso</h2>
+      <p>Este curso é um complemento do livro <strong>Estatística Descritiva</strong>. Digite o código de acesso que você recebeu ao comprar o livro.</p>
+      <form id="formCodigo" autocomplete="off">
+        <input type="text" id="campoCodigo" placeholder="Código de acesso" maxlength="30" autocapitalize="characters" spellcheck="false" aria-label="Código de acesso">
+        <button class="btn-prim" type="submit">Entrar no curso</button>
+        <div class="erro" id="erroCodigo" role="alert"></div>
+      </form>
+      <p class="ajuda">Não encontrou o seu código? <a id="linkAjuda" href="#" target="_blank" rel="noopener">Fale com a gente pelo WhatsApp</a>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PAINEL -->
+<main class="painel" id="telaPainel" hidden>
+  <section class="hero">
+    <div>
+      <div class="rot">Painel do curso</div>
+      <h1>Estatística Descritiva</h1>
+      <p>Aprendendo com a vida real · 13 aulas interativas</p>
+      <div class="autor"><b>LC</b> Luiz de Castro</div>
+      <a class="btn-prim" id="btnContinuar" href="#">Começar o curso</a>
+    </div>
+    <div class="anel" aria-label="Progresso geral do curso">
+      <svg width="150" height="150" viewBox="0 0 150 150"><circle cx="75" cy="75" r="64" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="12"/><circle id="anelArco" cx="75" cy="75" r="64" fill="none" stroke="#E4572E" stroke-width="12" stroke-linecap="round" stroke-dasharray="402.1" stroke-dashoffset="402.1" style="transition:stroke-dashoffset .8s"/></svg>
+      <div class="val"><div><b id="anelPct">0%</b><span>do curso</span></div></div>
+    </div>
+  </section>
+  <div class="resumo">
+    <div><b id="rConc">0</b><span>aulas concluídas</span></div>
+    <div><b id="rAnd">0</b><span>em andamento</span></div>
+    <div><b id="rFalt">13</b><span>a começar</span></div>
+  </div>
+  <div id="blocos"></div>
+  <div class="aviso" id="avisoProg">O seu progresso fica salvo neste navegador. Em outro aparelho, digite o código de novo; o progresso começa do zero lá.</div>
+  <footer class="rodape">
+    <span>Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</span>
+    <span>Dúvidas? <a id="linkAjuda2" href="#" target="_blank" rel="noopener">WhatsApp</a></span>
+  </footer>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var C=window.Curso, entrada=document.getElementById("telaEntrada"), painel=document.getElementById("telaPainel");
+  document.getElementById("linkAjuda").href=C.whatsappLink();
+  document.getElementById("linkAjuda2").href=C.whatsappLink("Olá! Tenho uma dúvida sobre o curso Estatística Descritiva.");
+  var params=new URLSearchParams(location.search), retorno=params.get("retorno");
+  if(retorno && !/^aula-\d{2}\.html$/.test(retorno)) retorno=null;
+
+  function mostrar(){
+    var ok=C.temAcesso(); entrada.hidden=ok; painel.hidden=!ok;
+    var area=document.getElementById("areaSair"); area.innerHTML="";
+    if(ok){ var b=document.createElement("button"); b.className="btn-sair"; b.type="button"; b.textContent="Sair"; b.addEventListener("click",function(){ C.logout(); mostrar(); }); area.appendChild(b); montarPainel(); }
+    else setTimeout(function(){ document.getElementById("campoCodigo").focus(); },50);
+  }
+
+  document.getElementById("formCodigo").addEventListener("submit", function(e){
+    e.preventDefault();
+    var campo=document.getElementById("campoCodigo"), erro=document.getElementById("erroCodigo");
+    if(!campo.value.trim()){ erro.textContent="Digite o código de acesso."; return; }
+    var r=C.entrar(campo.value);
+    if(r==="invalido"){ erro.textContent="Código incorreto. Confira o código que veio com o seu livro e tente de novo."; return; }
+    if(r==="armazenamento"){ erro.textContent="O seu navegador não permitiu guardar o acesso. Desative o modo anônimo ou tente outro navegador."; return; }
+    erro.textContent="";
+    if(retorno){ location.href=retorno; return; }
+    mostrar(); window.scrollTo(0,0);
+  });
+
+  function montarPainel(){
+    if(!C.persistente) document.getElementById("avisoProg").textContent="Este navegador não permite salvar dados desta página: o acesso e o progresso valem enquanto esta aba estiver aberta.";
+    var p=C.getProgresso(), prox=C.proximaAula(), geral=C.progressoGeral(), conc=C.concluidas();
+    var and=C.LESSONS.filter(function(l){ var v=p[l.n]||0; return v>0&&v<100; }).length;
+    document.getElementById("anelPct").textContent=geral+"%";
+    document.getElementById("anelArco").style.strokeDashoffset=(402.1*(1-geral/100)).toFixed(1);
+    document.getElementById("rConc").textContent=conc; document.getElementById("rAnd").textContent=and; document.getElementById("rFalt").textContent=C.LESSONS.length-conc-and;
+    var bc=document.getElementById("btnContinuar");
+    if(!prox){ bc.textContent="Curso concluído · rever a aula introdutória"; bc.href=C.aulaFile(0); }
+    else if(geral===0){ bc.textContent="Começar pela aula introdutória"; bc.href=C.aulaFile(0); }
+    else { bc.textContent="Continuar: "+(prox.n===0?"Aula introdutória":"Lição "+prox.n); bc.href=C.aulaFile(prox.n); }
+    var h="";
+    Object.keys(C.BLOCOS).forEach(function(b){
+      var aulas=C.LESSONS.filter(function(l){return String(l.bloco)===b;});
+      var feitas=aulas.filter(function(l){return (p[l.n]||0)>=100;}).length;
+      h+='<section class="bloco"><h2><span class="nb">'+(b==="0"?"★":b)+'</span>'+C.BLOCOS[b]+'<small>'+feitas+' de '+aulas.length+' concluída'+(aulas.length>1?"s":"")+'</small></h2><div class="grade">';
+      aulas.forEach(function(l){
+        var v=p[l.n]||0, cls=v>=100?"feita":v>0?"andamento":"", tag=v>=100?"✓ Concluída":v>0?"Em andamento · "+v+"%":"Não iniciada";
+        if(prox&&prox.n===l.n&&geral>0) cls+=" destaque";
+        h+='<a class="aula '+cls+'" href="'+C.aulaFile(l.n)+'"><div class="cab"><span class="num">'+(v>=100?"✓":l.n)+'</span><div><div class="tag">'+tag+'</div></div></div><h3>'+(l.n===0?"":"Lição "+l.n+" · ")+l.titulo+'</h3><p>'+l.temas+'</p><div class="barra"><i style="width:'+v+'%"></i></div><div class="rod"><span>🎧 intro em áudio</span><span class="ir">'+(v>=100?"Rever":v>0?"Continuar":"Abrir")+' →</span></div></a>';
+      });
+      h+='</div></section>';
+    });
+    document.getElementById("blocos").innerHTML=h;
+  }
+  window.addEventListener("pageshow", function(){ if(C.temAcesso()) montarPainel(); });
+  mostrar();
+})();
+</script>
+</body>
+</html>

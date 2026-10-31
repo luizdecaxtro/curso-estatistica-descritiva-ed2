@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 2 – Distribuição de frequência para dados contínuos | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+</style>
+</head>
+<body data-aula="aula02">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 2 · Distribuição de frequência</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="ativa"><span class="num">2</span>Distribuição de frequência para dados contínuos</li>
+    <li><span class="num">3</span>Representando dados com gráficos<span class="cad">🔒</span></li>
+    <li><span class="num">4</span>Moda: o valor que mais se repete<span class="cad">🔒</span></li>
+    <li><span class="num">5</span>Média aritmética: o ponto de equilíbrio<span class="cad">🔒</span></li>
+    <li><span class="num">6</span>Mediana: o valor central<span class="cad">🔒</span></li>
+    <li><span class="num">7</span>Quartis, decis e percentis<span class="cad">🔒</span></li>
+    <li><span class="num">8</span>Amplitude e amplitude interquartil<span class="cad">🔒</span></li>
+    <li><span class="num">9</span>Variância<span class="cad">🔒</span></li>
+    <li><span class="num">10</span>Desvio padrão<span class="cad">🔒</span></li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 2 de 12</div>
+    <h2>Distribuição de frequência para dados contínuos</h2>
+    <p style="color:#E4E7EB">Classes, amplitude, ponto médio e histograma</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 2</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 2. Na lição anterior, organizamos o número de irmãos contando valor por valor. Funcionou porque havia poucos valores possíveis: zero, um, dois, três.</p>
+<p class="narra">Agora pense em outra pergunta: quanto tempo você leva de casa até a faculdade? Doze minutos, dezoito, vinte e cinco, sete... Quando a variável é contínua, como um tempo ou o valor de uma compra, dois registros raramente coincidem. Uma tabela com uma linha para cada valor seria quase tão longa quanto a lista original e não resumiria nada. É aqui que entra a ideia central desta lição: agrupar os valores em faixas, chamadas classes.</p>
+<p class="narra">Agrupar é uma troca. Perdemos o valor exato de cada observação, mas ganhamos uma visão de conjunto: onde os valores se concentram e onde ficam raros. E a escolha das faixas exige cuidado, porque ela muda a imagem que se forma dos dados.</p>
+<p class="narra">Você vai aprender, em quatro passos, a calcular a amplitude total, a usar a regra de Sturges para escolher o número de classes, a definir a amplitude de cada classe e a aplicar a convenção em que o limite inferior entra e o superior fica de fora. Também vai conhecer o ponto médio da classe, que volta mais adiante no curso, quando calcularmos a média e o desvio padrão de dados agrupados.</p>
+<p class="narra">O resultado é a tabela por classes e o seu gráfico típico, o histograma, com as barras encostadas. Na aula, você vai colocar tempos nas classes certas, ver a tabela se formar, mudar o número de classes para ver o histograma se transformar e montar uma tabela com os seus próprios dados. No final, um quiz com os tempos de espera numa fila de banco. Vamos lá?</p>
+      </div></details>
+    </div>
+    
+    <div class="citacao">Quando uma variável assume muitos valores distintos, agrupá-los em classes torna a distribuição de frequência legível.<small>TRIOLA, 2017</small></div>
+    <p>Na Lição 1, organizamos o número de irmãos contando cada valor. Isso funciona porque há poucos valores possíveis. Com uma variável contínua, como o tempo de deslocamento, dois registros raramente coincidem. A solução é agrupar os valores em intervalos, chamados <b>classes</b>. Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Explicar por que agrupamos dados contínuos em classes</li>
+      <li><span class="n">2</span>Calcular a amplitude total, o número de classes e a amplitude de classe</li>
+      <li><span class="n">3</span>Aplicar a convenção [a; b) e calcular pontos médios</li>
+      <li><span class="n">4</span>Construir a tabela por classes e ler o histograma</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Quando contar valor por valor não funciona</h2>
+    <p>Explore as três situações.</p>
+    <div class="abas">
+      <button class="on" data-aba="a1">Tempo até a faculdade</button>
+      <button data-aba="a2">Notas de uma turma grande</button>
+      <button data-aba="a3">Compras de uma loja</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Vinte estudantes registraram, em minutos, o tempo que levam de casa até a faculdade:</p>
+      <div class="fichas" id="fichasTempo"></div>
+      <p>Olhando a lista, é difícil perceber algum padrão. Quantos gastam menos de 25 minutos? Seria preciso contar um por um. Agrupando os tempos em faixas de 6 minutos, a resposta aparece quase de imediato. Vamos usar estes dados ao longo de toda a lição.</p>
+    </div>
+    <div class="painel" id="a2">
+      <p>Uma professora corrigiu uma prova de 100 pontos feita por 40 alunos. As notas vão de 23 a 97, e quase todas são diferentes entre si. Uma tabela com um valor por linha teria dezenas de linhas e não resumiria nada.</p>
+      <p>Agrupar as notas em faixas de 10 pontos (20 a 29, 30 a 39, e assim por diante) permite ver de relance onde está a maior parte da turma.</p>
+    </div>
+    <div class="painel" id="a3">
+      <p>Um gerente registra o valor, em reais, de 30 compras feitas em um dia. Como cada valor é quase sempre diferente, ele não consegue responder com clareza perguntas como “quantas compras foram de até R$ 50?”.</p>
+      <p>O procedimento é o mesmo: definir faixas de valor e contar quantas compras caem em cada uma.</p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. CARTÕES -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Conceito</div>
+    <h2>Por que agrupar em classes?</h2>
+    <p>Agrupar é uma troca. Clique nos cartões para ver o que se perde, o que se ganha e o cuidado necessário.</p>
+    <div class="cartoes">
+      <button class="cartao"><div class="giro"><div class="face frente">O que se perde?<small>Clique para virar</small></div><div class="face verso">Deixamos de saber o valor exato de cada observação. Sabemos apenas em qual faixa ela está.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">O que se ganha?<small>Clique para virar</small></div><div class="face verso">Uma leitura de conjunto que a lista original não oferece: onde os valores se concentram e onde rareiam.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Qual o cuidado?<small>Clique para virar</small></div><div class="face verso">A escolha das faixas deve ser feita com cuidado, porque ela influencia a imagem que se forma dos dados.</div></div></button>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3">Continuar</button></div>
+</section>
+
+<!-- 3. ELEMENTOS: PASSOS -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Os elementos de uma distribuição por classes</div>
+    <h2>Quatro passos com os tempos de deslocamento</h2>
+    <p>Use as setas para acompanhar o cálculo com os dados do Exemplo 1.</p>
+    <div class="passos" id="passos">
+      <span class="etq" id="passoEtq">Passo 1</span>
+      <div class="passo on"><h3>Amplitude total (R)</h3><p>É a diferença entre o maior e o menor valor observado.</p><div class="formula">R = valor máximo − valor mínimo = 35 − 7 = <b>28 minutos</b></div><p>Esse valor delimita o intervalo que as classes precisam cobrir.</p></div>
+      <div class="passo"><h3>Número de classes (k)</h3><p>Não existe regra única. Uma regra prática muito citada é a de Sturges (1926), em que n é o número de observações:</p><div class="formula">k ≈ 1 + 3,3 · log<sub>10</sub>(n) = 1 + 3,3 · log<sub>10</sub>(20) ≈ <b>5,3</b></div><p>Ou seja, cerca de cinco classes. É um ponto de partida, não uma exigência: o bom senso sobre a clareza da tabela deve prevalecer.</p></div>
+      <div class="passo"><h3>Amplitude de classe (h)</h3><p>Divida a amplitude total pelo número de classes:</p><div class="formula">h ≈ R / k = 28 / 5 = 5,6 → arredondamos para <b>h = 6 minutos</b></div><p>Com cinco classes de amplitude 6, cobrimos de 7 a 37 minutos, o que contém todos os dados. Se o arredondamento deixasse alguma observação de fora, bastaria acrescentar uma classe.</p></div>
+      <div class="passo"><h3>Limites e ponto médio</h3><p>Incluímos o limite inferior e excluímos o superior: <b>[a; b)</b>. Assim, o valor 13 pertence a [13; 19), e não a [7; 13). Isso evita contar um valor duas vezes.</p><div class="formula">Ponto médio de [7; 13) = (7 + 13) / 2 = <b>10 minutos</b></div></div>
+      <button class="seta esq" id="pAnt" aria-label="Passo anterior" disabled>‹</button>
+      <button class="seta dir" id="pProx" aria-label="Próximo passo">›</button>
+      <div class="pontos" id="pPontos"><span class="on">1</span><span>2</span><span>3</span><span>4</span></div>
+    </div>
+  </div>
+  <div class="bloco largo" style="padding-top:40px"><div class="dentro">
+    <div class="rotulo">Experimente</div>
+    <h3>Calculadora da regra de Sturges</h3>
+    <p class="fonte">Arraste para mudar o número de observações (n) e veja quantas classes a regra sugere.</p>
+    <div class="painel-calc">
+      <label for="sturN">n = <b id="sturNval">20</b> observações</label>
+      <input type="range" id="sturN" min="5" max="1000" value="20">
+      <div class="caixas">
+        <div class="caixa"><span>log<sub>10</sub>(n)</span><b id="sturLog">1,301</b></div>
+        <div class="caixa"><span>k ≈ 1 + 3,3·log<sub>10</sub>(n)</span><b id="sturK">5,3</b></div>
+        <div class="caixa destaque-cx"><span>Sugestão</span><b id="sturKr">cerca de 5 classes</b></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="4">Continuar</button></div>
+</section>
+
+<!-- 4. QUESTÃO LIMITES -->
+<section class="secao" data-s="4">
+  <div class="bloco">
+    <div class="rotulo">Verifique</div>
+    <h2>A convenção [a; b)</h2>
+    <div class="questao" data-q="lim">
+      <div class="enunciado">Considere as classes [2; 5), [5; 8) e [8; 11). Em qual classe deve ficar o valor 5?</div>
+      <button class="opcao"><span class="radio"></span>[2; 5)</button>
+      <button class="opcao" data-certa><span class="radio"></span>[5; 8)</button>
+      <button class="opcao"><span class="radio"></span>Nas duas classes</button>
+      <button class="opcao"><span class="radio"></span>Em nenhuma das classes</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. O limite inferior é incluído e o superior é excluído. O 5 é o início da segunda classe; a primeira termina imediatamente antes dele. Pelo mesmo raciocínio, o 8 fica em [8; 11)." data-nao="Ainda não. Pela convenção [a; b), o limite inferior entra e o superior fica de fora. Então o 5 não pertence a [2; 5): ele é o início de [5; 8)."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="5" data-trava="lim">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 5. ARRASTAR VALORES PARA CLASSES -->
+<section class="secao" data-s="5">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Atividade</div>
+    <h2>Coloque cada tempo na sua classe</h2>
+    <p>Arraste cada tempo (em minutos) para a classe correta. Atenção aos valores que caem exatamente num limite.</p>
+    <p class="fonte">No celular, toque no valor e depois toque na classe.</p>
+    <div class="dd-banco" id="ddBanco"></div>
+    <div class="dd-zonas cinco" id="ddZonas"></div>
+    <div class="dd-msg" id="ddMsg"></div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="6" data-trava="dd">Continuar</button><div class="dica-trava">Classifique todos os valores para continuar</div></div>
+</section>
+
+<!-- 6. TABELA + HISTOGRAMA ANIMADOS -->
+<section class="secao" data-s="6">
+  <div class="bloco">
+    <div class="rotulo">Construindo a tabela</div>
+    <h2>Os 20 tempos, classe por classe</h2>
+    <p>Agora com todos os dados. Clique em <b>Classificar próximo</b> para ver cada tempo entrar na sua classe, ou em <b>Classificar todos</b>.</p>
+    <div class="fichas" id="contFichas"></div>
+    <div class="controles">
+      <button class="btn-sec" id="contUm">Classificar próximo</button>
+      <button class="btn-sec" id="contTudo">Classificar todos</button>
+      <button class="btn-sec" id="contReset">Recomeçar</button>
+    </div>
+    <div id="contTabela"></div>
+    <p class="fonte">Tabela 2 – Distribuição de frequência dos tempos de deslocamento de 20 estudantes (dados fictícios). Fonte: elaboração do autor.</p>
+    <div id="contGrafico"></div>
+    <p class="fonte" id="legHist" style="display:none">Figura 2 – Histograma dos tempos de deslocamento de 20 estudantes (dados fictícios). Fonte: elaboração do autor.</p>
+    <div id="contConclusao" style="display:none">
+      <div class="citacao">A maior parte dos estudantes gasta entre 7 e 25 minutos, e apenas 2 de 20 levam 31 minutos ou mais. A coluna F responde direto: 15 estudantes gastam menos de 25 minutos, ou seja, 75% do grupo.</div>
+      <h3>Por que as barras estão encostadas?</h3>
+      <p>No histograma, as barras ficam encostadas porque os intervalos são contíguos: uma classe começa exatamente onde a outra termina. Como todas as classes têm a mesma amplitude, a altura de cada barra equivale à frequência absoluta.</p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="7" data-trava="cont">Continuar</button><div class="dica-trava">Classifique todos os tempos para continuar</div></div>
+</section>
+
+<!-- 7. EXPLORAR NÚMERO DE CLASSES -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Experimente</div>
+    <h2>A escolha das classes muda a imagem</h2>
+    <p>Os mesmos 20 tempos, com outro número de classes. Mude o k e observe como o histograma se transforma.</p>
+    <div class="painel-calc">
+      <label for="kSel">Número de classes desejado: k = <b id="kVal">5</b></label>
+      <input type="range" id="kSel" min="3" max="8" value="5">
+      <div class="caixas">
+        <div class="caixa"><span>R / k</span><b id="kRk">5,6</b></div>
+        <div class="caixa"><span>Amplitude h (arredondada para cima)</span><b id="kH">6</b></div>
+        <div class="caixa destaque-cx"><span>Classes necessárias</span><b id="kN">5</b></div>
+      </div>
+      <p class="fonte" id="kAviso"></p>
+      <div id="kGrafico"></div>
+    </div>
+    <p style="margin-top:18px">Com poucas classes, a forma fica escondida; com classes demais, surgem buracos e o desenho fica irregular. Por isso a regra de Sturges é um <b>ponto de partida</b>, e o bom senso decide.</p>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8">Continuar</button></div>
+</section>
+
+<!-- 8. HISTOGRAMA OU BARRAS -->
+<section class="secao" data-s="8">
+  <div class="bloco">
+    <div class="rotulo">Histograma ou gráfico de barras?</div>
+    <h2>Barras separadas ou encostadas?</h2>
+    <div class="comparar">
+      <div><h3>Gráfico de barras</h3><div id="cmpBarras"></div><p class="fonte">Categorias ou contagens discretas: barras <b>separadas</b>.</p></div>
+      <div><h3>Histograma</h3><div id="cmpHist"></div><p class="fonte">Classes de uma variável contínua: barras <b>encostadas</b>.</p></div>
+    </div>
+    <div class="questao" data-q="graf">
+      <div class="enunciado">Um pesquisador quer representar a distribuição do tempo de espera de 50 clientes, em minutos. Qual gráfico deve usar?</div>
+      <button class="opcao"><span class="radio"></span>Gráfico de barras, com barras separadas</button>
+      <button class="opcao" data-certa><span class="radio"></span>Histograma, com barras encostadas</button>
+      <button class="opcao"><span class="radio"></span>Tanto faz, os dois são iguais</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. O tempo de espera é contínuo e os valores são agrupados em classes contíguas, que se sucedem sem interrupção. Já o número de filhos de 50 famílias (0, 1, 2, 3 ou mais) pediria um gráfico de barras." data-nao="Não é essa. O tempo é uma variável contínua, agrupada em classes que se sucedem sem interrupção. Nesse caso, o histograma, com barras encostadas, é o apropriado."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="9" data-trava="graf">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 9. LABORATÓRIO -->
+<section class="secao" data-s="9">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">Monte a tabela com os seus dados</h3>
+      <p>Registre algo contínuo do seu dia a dia: o tempo de deslocamento de colegas, o valor de compras, a duração de ligações. Digite os valores abaixo (use vírgula para decimais e espaço ou ponto e vírgula para separar). A tabela segue os quatro passos da lição.</p>
+    </div>
+    <div style="margin-top:20px">
+      <textarea id="labDados" rows="3" placeholder="Ex.: 12 18 25 7 31 22 15 9 27 19 14 35 21 11 16 29 24 8 17 20"></textarea>
+      <div class="erro-txt" id="labErro"></div>
+      <div class="controles">
+        <button class="btn-sec" id="labGerar">Gerar tabela e histograma</button>
+        <button class="btn-sec" id="labExemplo">Usar os dados do Exemplo 1</button>
+      </div>
+      <div id="labPassos"></div>
+      <div id="labTabela"></div>
+      <div id="labGrafico"></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="10">Continuar</button></div>
+</section>
+
+<!-- 10. RESUMO -->
+<section class="secao" data-s="10">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="acordeao">
+      <details><summary>Amplitude total (R)</summary><div class="corpo"><p>Diferença entre o maior e o menor valor: R = máx − mín.</p></div></details>
+      <details><summary>Número de classes (k)</summary><div class="corpo"><p>Pode ser orientado pela regra de Sturges, k ≈ 1 + 3,3 · log<sub>10</sub>(n), como ponto de partida.</p></div></details>
+      <details><summary>Amplitude de classe (h)</summary><div class="corpo"><p>h ≈ R / k, em geral arredondada para facilitar a leitura, desde que todas as observações fiquem cobertas.</p></div></details>
+      <details><summary>Limites e ponto médio</summary><div class="corpo"><p>Limite inferior incluído e superior excluído, [a; b). O ponto médio é a média dos limites.</p></div></details>
+      <details><summary>Tabela e histograma</summary><div class="corpo"><p>A distribuição é apresentada em tabela com f, f (%) e F e, em geral, em histograma, com barras encostadas.</p></div></details>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="11">Ir para o quiz</button></div>
+</section>
+
+<!-- 11. QUIZ -->
+<section class="secao" data-s="11">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 2 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões baseadas nos exercícios do Capítulo 2. As quatro primeiras usam os tempos de espera de 12 clientes numa fila de banco: <b>2, 5, 3, 8, 6, 4, 10, 7, 3, 9, 5 e 6</b> minutos.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL = 12;
+var CHAVE = "decastro-estat-l2";
+var estado = {s:0, travas:{}};
+try{ var g = localStorage.getItem(CHAVE); if(g) estado = JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+
+var TEMPOS=[12,18,25,7,31,22,15,9,27,19,14,35,21,11,16,29,24,8,17,20];
+document.getElementById("fichasTempo").innerHTML = TEMPOS.map(function(v){return '<span class="ficha">'+v+'</span>';}).join("");
+
+var secoes = Array.prototype.slice.call(document.querySelectorAll(".secao"));
+function atualizarProgresso(){
+  var p = estado.quizFeito ? 100 : Math.round((estado.s+1)/TOTAL*100);
+  document.getElementById("pct").textContent = p;
+  document.getElementById("barra").style.width = p+"%";
+}
+function liberar(chave){
+  estado.travas[chave]=true; salvar();
+  document.querySelectorAll('.continuar[data-trava="'+chave+'"]').forEach(function(b){
+    b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none";
+  });
+}
+var aoAbrir = {};
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled = true;
+  else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){
+    var n = +b.dataset.prox;
+    estado.s = Math.max(estado.s, n); salvar();
+    var alvo = document.querySelector('.secao[data-s="'+n+'"]');
+    alvo.classList.add("visivel"); b.parentNode.style.display="none";
+    atualizarProgresso(); if(aoAbrir[n]) aoAbrir[n]();
+    setTimeout(function(){ alvo.scrollIntoView({behavior:"smooth", block:"start"}); }, 60);
+  });
+});
+
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");}, 400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+
+document.querySelectorAll(".abas button").forEach(function(b){
+  b.addEventListener("click", function(){
+    var pai=b.parentNode, bloco=pai.parentNode;
+    pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});
+    bloco.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");});
+    b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on");
+  });
+});
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+
+/* múltipla escolha */
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), escolha=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); escolha=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){
+    if(!escolha) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; escolha=null; feito=false; return; }
+    feito=true; var certo=escolha.hasAttribute("data-certa");
+    escolha.classList.add(certo?"certa":"errada");
+    ret.textContent = certo?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(certo?"ok":"nao");
+    if(certo){ env.style.display="none"; liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO";
+  });
+});
+
+/* passos */
+var passoAt=0, passos=document.querySelectorAll(".passo"), pontos=document.querySelectorAll("#pPontos span");
+function irPasso(n){
+  passoAt=n; passos.forEach(function(p,i){p.classList.toggle("on",i===n);}); pontos.forEach(function(p,i){p.classList.toggle("on",i===n);});
+  document.getElementById("passoEtq").textContent="Passo "+(n+1);
+  document.getElementById("pAnt").disabled=n===0; document.getElementById("pProx").disabled=n===passos.length-1;
+}
+document.getElementById("pAnt").addEventListener("click", function(){ irPasso(Math.max(0,passoAt-1)); });
+document.getElementById("pProx").addEventListener("click", function(){ irPasso(Math.min(passos.length-1,passoAt+1)); });
+pontos.forEach(function(p,i){ p.style.cursor="pointer"; p.addEventListener("click", function(){irPasso(i);}); });
+
+/* Sturges */
+var sN=document.getElementById("sturN");
+function sturges(){
+  var n=+sN.value, l=Math.log10(n), k=1+3.3*l;
+  document.getElementById("sturNval").textContent=n;
+  document.getElementById("sturLog").textContent=br(l,3);
+  document.getElementById("sturK").textContent=br(k,1);
+  document.getElementById("sturKr").textContent="cerca de "+Math.round(k)+" classes";
+}
+sN.addEventListener("input", sturges); sturges();
+
+/* classes e histograma */
+function montarClasses(dados, inicio, h){
+  var max=Math.max.apply(null,dados), classes=[];
+  for(var a=inicio; a<=max; a=+(a+h).toFixed(10)){ classes.push({a:a,b:+(a+h).toFixed(10),f:0}); if(classes.length>60) break; }
+  dados.forEach(function(x){ var i=Math.floor(+((x-inicio)/h).toFixed(9)); if(classes[i]) classes[i].f++; });
+  return classes;
+}
+function fmt(v){ var s = Math.abs(v-Math.round(v))<1e-9 ? String(Math.round(v)) : br(v, (Math.abs(v*10-Math.round(v*10))<1e-9)?1:2); return s; }
+function tabelaClasses(cl, n, completa, rotulo, piscar){
+  var h='<table class="freq"><tr><th>'+rotulo+'</th><th>Ponto médio</th><th>f</th><th>f (%)</th><th>F</th></tr>', F=0, tot=0;
+  cl.forEach(function(c,i){
+    F+=c.f; tot+=c.f;
+    h+='<tr'+(i===piscar?' class="pisca"':'')+'><td>['+fmt(c.a)+'; '+fmt(c.b)+')</td><td>'+fmt((c.a+c.b)/2)+'</td><td>'+c.f+'</td><td>'+(completa?br(c.f/n*100,1).replace(",0","")+"%":"–")+'</td><td>'+(completa?F:"–")+'</td></tr>';
+  });
+  return h+'<tr class="total"><td>Total</td><td>—</td><td>'+tot+'</td><td>'+(completa?"100%":"–")+'</td><td>—</td></tr></table>';
+}
+function histograma(cl, eixoX, encostado){
+  var W=560,H=290,m={l:44,r:16,t:22,b:52}, max=1;
+  cl.forEach(function(c){max=Math.max(max,c.f);});
+  var iw=W-m.l-m.r, ih=H-m.t-m.b, bw=iw/cl.length, passo=Math.ceil(max/6);
+  var s='<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(encostado?"Histograma":"Gráfico de barras")+'">';
+  for(var k=0;k<=max;k+=passo){ var y=m.t+ih-ih*k/max; s+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" stroke="#E4E7EB"/><text x="'+(m.l-8)+'" y="'+(y+4)+'" font-size="12" text-anchor="end" fill="#7B8794">'+k+'</text>'; }
+  cl.forEach(function(c,i){
+    var hh=ih*c.f/max, x=m.l+i*bw+(encostado?0:bw*.2), w=encostado?bw:bw*.6;
+    s+='<rect x="'+x+'" y="'+(m.t+ih-hh)+'" width="'+w+'" height="'+hh+'" fill="#E4572E" stroke="'+(encostado?"#fff":"none")+'" stroke-width="1.5"><title>'+(c.rot||('['+fmt(c.a)+'; '+fmt(c.b)+')'))+': '+c.f+'</title></rect>';
+    if(c.f>0) s+='<text x="'+(x+w/2)+'" y="'+(m.t+ih-hh-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">'+c.f+'</text>';
+    if(encostado){
+      s+='<text x="'+x+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+fmt(c.a)+'</text>';
+      if(i===cl.length-1) s+='<text x="'+(x+w)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+fmt(c.b)+'</text>';
+    } else s+='<text x="'+(x+w/2)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+c.rot+'</text>';
+  });
+  s+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+(m.t+ih)+'" y2="'+(m.t+ih)+'" stroke="#9AA5B1"/>';
+  s+='<text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">'+eixoX+'</text>';
+  s+='<text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">Frequência (f)</text></svg>';
+  return s;
+}
+
+/* arrastar valores */
+var ITENS=[7,12,13,18,19,22,25,30,31,35];
+var CL5=[[7,13],[13,19],[19,25],[25,31],[31,37]];
+var banco=document.getElementById("ddBanco"), zonasEl=document.getElementById("ddZonas"), msg=document.getElementById("ddMsg");
+CL5.forEach(function(c,i){ zonasEl.insertAdjacentHTML("beforeend",'<div class="dd-zona" data-z="'+i+'"><h4>['+c[0]+'; '+c[1]+')<small>de '+c[0]+' até antes de '+c[1]+'</small></h4></div>'); });
+var zonas=zonasEl.querySelectorAll(".dd-zona"), restantes=ITENS.length, selecionado=null;
+ITENS.slice().sort(function(){return Math.random()-.5;}).forEach(function(v){
+  var z=CL5.findIndex(function(c){return v>=c[0]&&v<c[1];});
+  var d=document.createElement("div"); d.className="dd-item"; d.textContent=v+" min"; d.dataset.z=z; d.dataset.v=v; banco.appendChild(d); ligarDrag(d);
+});
+function soltar(item, zona){
+  if(!zona) return;
+  var v=+item.dataset.v;
+  if(zona.dataset.z===item.dataset.z){
+    item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item);
+    var c=CL5[+item.dataset.z];
+    msg.style.color="var(--verde)"; msg.textContent = (v===c[0]) ? "Correto: "+v+" é o limite inferior, e o limite inferior é incluído." : "Correto: "+c[0]+" ≤ "+v+" < "+c[1]+".";
+    restantes--; selecionado=null;
+    if(restantes===0){ msg.textContent="Muito bem! Todos os valores estão nas classes certas."; liberar("dd"); }
+  } else {
+    item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400);
+    var cz=CL5[+zona.dataset.z];
+    msg.style.color="var(--vermelho)";
+    msg.textContent = (v===cz[1]) ? "Ainda não: "+v+" é o limite superior de ["+cz[0]+"; "+cz[1]+"), e o limite superior fica de fora." : "Ainda não: "+v+" não está entre "+cz[0]+" e "+cz[1]+".";
+  }
+}
+function ligarDrag(el){
+  var fantasma=null, ox=0, oy=0, moveu=false, x0=0, y0=0;
+  el.addEventListener("pointerdown", function(e){ if(el.classList.contains("fixo")) return; moveu=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointermove", function(e){
+    if(!el.hasPointerCapture(e.pointerId)) return;
+    if(!moveu && Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+    if(!moveu){ moveu=true; fantasma=el.cloneNode(true); fantasma.classList.add("fantasma"); fantasma.style.width=el.offsetWidth+"px"; document.body.appendChild(fantasma); el.style.opacity=".3"; }
+    fantasma.style.left=(e.clientX-ox)+"px"; fantasma.style.top=(e.clientY-oy)+"px";
+    zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo");
+  });
+  el.addEventListener("pointerup", function(e){
+    if(el.classList.contains("fixo")) return;
+    zonas.forEach(function(z){z.classList.remove("alvo");});
+    if(moveu){ fantasma.remove(); fantasma=null; el.style.opacity=""; soltar(el, zonaEm(e.clientX,e.clientY)); }
+    else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(selecionado===el) selecionado=null; else { selecionado=el; el.classList.add("selecionado"); } }
+  });
+}
+function zonaEm(x,y){ var el=document.elementFromPoint(x,y); return el?el.closest(".dd-zona"):null; }
+zonas.forEach(function(z){ z.addEventListener("click", function(){ if(selecionado) soltar(selecionado,z); }); });
+
+/* classificação animada */
+var pos=0, cls=null, iniciada=false, cF=document.getElementById("contFichas");
+function desenhar(piscar){
+  var fim=pos>=TEMPOS.length;
+  document.getElementById("contTabela").innerHTML=tabelaClasses(cls,TEMPOS.length,fim,"Classe (minutos)",piscar);
+  document.getElementById("contGrafico").innerHTML=histograma(cls,"Tempo de deslocamento (minutos)",true);
+  document.getElementById("legHist").style.display=fim?"block":"none";
+  document.getElementById("contConclusao").style.display=fim?"block":"none";
+  document.getElementById("contUm").disabled=fim; document.getElementById("contTudo").disabled=fim;
+  if(fim) liberar("cont");
+}
+function iniciar(){
+  if(iniciada) return; iniciada=true;
+  cF.innerHTML=TEMPOS.map(function(v){return '<span class="ficha">'+v+'</span>';}).join("");
+  cls=CL5.map(function(c){return {a:c[0],b:c[1],f:0};}); desenhar();
+}
+aoAbrir[6]=iniciar;
+function classificarUm(){
+  if(pos>=TEMPOS.length) return;
+  var fichas=cF.querySelectorAll(".ficha"), v=TEMPOS[pos], i=Math.floor((v-7)/6);
+  fichas.forEach(function(f){f.classList.remove("destaque");}); fichas[pos].classList.add("destaque");
+  (function(j){ setTimeout(function(){ fichas[j].classList.remove("destaque"); fichas[j].classList.add("contada"); },600); })(pos);
+  cls[i].f++; pos++; desenhar(i);
+}
+document.getElementById("contUm").addEventListener("click", classificarUm);
+document.getElementById("contTudo").addEventListener("click", function(){ this.disabled=true; var t=setInterval(function(){ if(pos>=TEMPOS.length){clearInterval(t);return;} classificarUm(); },300); });
+document.getElementById("contReset").addEventListener("click", function(){ pos=0; cls=CL5.map(function(c){return {a:c[0],b:c[1],f:0};}); cF.querySelectorAll(".ficha").forEach(function(f){f.className="ficha";}); desenhar(); });
+
+/* explorar k */
+var kSel=document.getElementById("kSel");
+function explorar(){
+  var k=+kSel.value, R=28, h=Math.ceil(R/k), cl=montarClasses(TEMPOS,7,h);
+  document.getElementById("kVal").textContent=k;
+  document.getElementById("kRk").textContent=br(R/k,1);
+  document.getElementById("kH").textContent=h;
+  document.getElementById("kN").textContent=cl.length;
+  document.getElementById("kAviso").textContent = cl.length>k ? "Com h = "+h+", "+k+" classes iriam de 7 até antes de "+(7+k*h)+" e deixariam o valor 35 de fora; por isso foi acrescentada uma classe." : (cl.length===5&&h===6 ? "Esta é a escolha da Tabela 2." : "");
+  document.getElementById("kGrafico").innerHTML=histograma(cl,"Tempo de deslocamento (minutos)",true);
+}
+kSel.addEventListener("input", explorar); explorar();
+
+/* comparação */
+document.getElementById("cmpBarras").innerHTML=histograma([{rot:"0",f:3},{rot:"1",f:5},{rot:"2",f:4},{rot:"3 ou mais",f:2}],"Número de filhos (ilustrativo)",false);
+document.getElementById("cmpHist").innerHTML=histograma(CL5.map(function(c,i){return {a:c[0],b:c[1],f:[5,5,5,3,2][i]};}),"Tempo (minutos)",true);
+
+/* laboratório */
+function lerNumeros(txt){
+  return txt.trim().split(/[\s;]+/).filter(function(x){return x!=="";}).map(function(x){ return Number(x.replace(",",".")); });
+}
+function laboratorio(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var d=lerNumeros(document.getElementById("labDados").value);
+  if(d.length<5){ erro.textContent="Digite pelo menos 5 valores."; return; }
+  if(d.some(function(x){return !isFinite(x);})){ erro.textContent="Há algum valor que não é número. Use vírgula só para decimais e separe os valores com espaço ou ponto e vírgula."; return; }
+  if(d.length>1000){ erro.textContent="Use no máximo 1000 valores."; return; }
+  var mn=Math.min.apply(null,d), mx=Math.max.apply(null,d), R=mx-mn;
+  if(R===0){ erro.textContent="Todos os valores são iguais; não há o que agrupar."; return; }
+  var n=d.length, k=1+3.3*Math.log10(n), kr=Math.max(2,Math.round(k));
+  var dec = d.some(function(x){return Math.abs(x-Math.round(x))>1e-9;}) ? 1 : 0;
+  var base=Math.pow(10,-dec), h=Math.ceil((R/kr)/base-1e-9)*base;
+  if(h*kr<=R+1e-9) h=+(h+base).toFixed(dec);
+  var cl=montarClasses(d,mn,h);
+  document.getElementById("labPassos").innerHTML='<div class="caixas">'+
+    '<div class="caixa"><span>n</span><b>'+n+'</b></div>'+
+    '<div class="caixa"><span>R = '+fmt(mx)+' − '+fmt(mn)+'</span><b>'+fmt(R)+'</b></div>'+
+    '<div class="caixa"><span>Sturges: k ≈ '+br(k,1)+'</span><b>'+kr+' classes</b></div>'+
+    '<div class="caixa destaque-cx"><span>h ≈ '+br(R/kr,2)+', arredondado</span><b>'+fmt(h)+'</b></div></div>'+
+    (cl.length>kr?'<p class="fonte">Foi acrescentada uma classe para cobrir o maior valor ('+fmt(mx)+').</p>':'');
+  document.getElementById("labTabela").innerHTML=tabelaClasses(cl,n,true,"Classe");
+  document.getElementById("labGrafico").innerHTML=histograma(cl,"Seus dados",true);
+}
+document.getElementById("labGerar").addEventListener("click", laboratorio);
+document.getElementById("labExemplo").addEventListener("click", function(){ document.getElementById("labDados").value=TEMPOS.join(" "); laboratorio(); });
+
+/* quiz */
+var QUIZ=[
+  {e:"Qual é a amplitude total (R) dos tempos de espera?", o:["10 minutos","8 minutos","12 minutos","6 minutos"], c:1,
+   x:"O maior tempo é 10 e o menor é 2. Logo, R = 10 − 2 = 8 minutos."},
+  {e:"Montando três classes de amplitude 3, começando em 2 minutos, quantos clientes ficam na classe [5; 8)?", o:["4","3","5","6"], c:2,
+   x:"[5; 8) contém 5, 5, 6, 6 e 7: são 5 clientes. A classe [2; 5) tem 4 (2, 3, 3, 4) e [8; 11) tem 3 (8, 9, 10)."},
+  {e:"Qual é o ponto médio da classe [8; 11)?", o:["9","9,5","10","3"], c:1,
+   x:"O ponto médio é a média dos limites: (8 + 11) / 2 = 9,5 minutos."},
+  {e:"Qual a porcentagem de clientes que esperaram menos de 8 minutos?", o:["41,7%","58,3%","75%","25%"], c:2,
+   x:"Menos de 8 minutos corresponde às classes [2; 5) e [5; 8): 4 + 5 = 9 clientes (F = 9). Logo, 9/12 = 0,75, ou seja, 75%."},
+  {e:"Para representar o número de filhos de 50 famílias (0, 1, 2, 3 ou mais), qual gráfico é o mais adequado?", o:["Histograma, com barras encostadas","Gráfico de barras, com barras separadas","Nenhum dos dois"], c:1,
+   x:"São categorias discretas, contadas uma a uma, sem continuidade entre elas. A regra geral: barras separadas para categorias ou contagens discretas; barras encostadas para classes de uma variável contínua."}
+];
+var qi=0, acertos=0, quizEl=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){
+    estado.quizFeito=true; salvar(); atualizarProgresso();
+    quizEl.innerHTML='<div class="questao placar"><div class="grande">'+acertos+'/'+QUIZ.length+'</div><p>'+(acertos>=4?"Excelente! Você está pronto para a Lição 3.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;acertos=0;renderQuiz();}); return;
+  }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+acertos+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  quizEl.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=quizEl.querySelectorAll(".opcao"), env=quizEl.querySelector(".btn-enviar"), ret=quizEl.querySelector(".retorno"), esc=-1, resp=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(resp) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){
+    if(!resp){ resp=true; var ok=esc===q.c; if(ok) acertos++;
+      ops[esc].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa");
+      ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x;
+      env.textContent = qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA";
+    } else { qi++; renderQuiz(); }
+  });
+}
+renderQuiz();
+
+/* restaurar */
+if(estado.s>0){
+  secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); });
+  document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; });
+  if(estado.s>=6) iniciar();
+}
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

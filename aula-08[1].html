@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 8 – Amplitude e amplitude interquartil | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+
+.palpites{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.btn-sec.on-p{background:var(--laranja);color:#fff}
+.tipos-moda{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+.tipos-moda div{background:var(--fundo);border-top:3px solid var(--laranja);border-radius:4px;padding:14px;text-align:center}
+.tipos-moda b{display:block;color:var(--tinta);font-size:16px}
+.tipos-moda span{font-size:12px;color:var(--cinza)}
+@media (max-width:860px){.tipos-moda{grid-template-columns:1fr 1fr}}
+
+table.editavel input{width:70px;padding:6px 8px;font-size:15px;border:1px solid var(--linha);border-radius:4px;text-align:center;font-family:inherit}
+table.editavel input:focus{outline:2px solid var(--laranja);border-color:transparent}
+#tabDesv th{font-size:12px}
+#tabDesv td,#tabDesv th{padding:8px 6px}
+@media (max-width:860px){#tabDesv{font-size:13px}}
+
+.fila{position:relative;height:78px;margin:16px 0 8px;overflow:hidden}
+.ficha-f{position:absolute;left:0;top:20px;height:44px;display:grid;place-items:center;background:#fff;border:1px solid var(--linha);border-radius:6px;font-weight:700;color:var(--tinta);font-size:15px;transition:transform .7s cubic-bezier(.4,1.3,.5,1),background .3s,color .3s;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.ficha-f::before{content:attr(data-pos);position:absolute;top:-19px;font-size:11px;color:var(--cinza);font-weight:400}
+.ficha-f.centro{background:var(--verde);color:#fff;border-color:var(--verde)}
+.ficha-f.alterado{outline:2px dashed var(--laranja);outline-offset:2px}
+.treino-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza)}
+input.resp{width:120px;padding:10px 12px;font-size:16px;border:1px solid var(--linha);border-radius:6px;font-family:inherit}
+input.resp:focus{outline:2px solid var(--laranja);border-color:transparent}
+.dois-lados{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+.lado{border:1px solid var(--linha);border-radius:6px;padding:20px;background:#fff}
+.lado.on-lado{border:2px solid var(--laranja);background:var(--laranja-claro)}
+.lado p{font-size:16px;margin:0}
+.lado h3{margin:0 0 8px}
+.icone{font-size:34px;margin-bottom:6px}
+.passo2{display:none}.passo2.on{display:block;animation:surgir .4s}
+.passo2 h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo2 p{font-size:16px}
+@media (max-width:860px){.dois-lados{grid-template-columns:1fr}}
+
+table.freq tr.pisca2 td{background:#FFF4D6}
+.lado .rotulo{display:block}
+
+.rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:860px){.grafico.filaq{min-width:480px}}
+
+.dois-campos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.dois-campos label{font-size:13px;font-weight:700;color:var(--tinta);display:block;margin-bottom:6px}
+@media (max-width:860px){.dois-campos{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-aula="aula08">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 8 · Amplitude e amplitude interquartil</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="feita"><span class="num">✓</span>Representando dados com gráficos</li>
+    <li class="feita"><span class="num">✓</span>Moda: o valor que mais se repete</li>
+    <li class="feita"><span class="num">✓</span>Média aritmética: o ponto de equilíbrio</li>
+    <li class="feita"><span class="num">✓</span>Mediana: o valor central</li>
+    <li class="feita"><span class="num">✓</span>Quartis, decis e percentis</li>
+    <li class="ativa"><span class="num">8</span>Amplitude e amplitude interquartil</li>
+    <li><span class="num">9</span>Variância<span class="cad">🔒</span></li>
+    <li><span class="num">10</span>Desvio padrão<span class="cad">🔒</span></li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 8 de 12 · Quão espalhados estão os dados?</div>
+    <h2>Amplitude e amplitude interquartil</h2>
+    <p style="color:#E4E7EB">As primeiras medidas de dispersão</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 8</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 8. Com ela, começamos um novo bloco da trilha. Até aqui, descrevemos o centro dos dados com a moda, a média, a mediana e as separatrizes. Mas o centro não conta a história toda.</p>
+<p class="narra">Pense em duas turmas com a mesma média seis. Na primeira, as notas são cinco, seis, seis, seis e sete: todo mundo perto do seis. Na segunda, são dois, quatro, seis, oito e dez: há alunos muito bem e alunos muito mal. Se um gestor olhar só para a média, vai concluir que as turmas são iguais. E vai errar. Para enxergar essa diferença, precisamos medir a dispersão: o quanto os valores se espalham.</p>
+<p class="narra">A medida mais simples é a amplitude total: a diferença entre o maior e o menor valor. Fácil de calcular e de entender. Mas ela tem um ponto fraco. Basta um único atendimento muito demorado para a amplitude de uma fila saltar de quatro para trinta minutos, mesmo que quase todos os atendimentos continuem parecidos.</p>
+<p class="narra">Para reduzir a influência dos extremos, vamos usar uma medida que você já conheceu na lição anterior: a amplitude interquartil, a diferença entre o terceiro e o primeiro quartis. Ela olha para os cinquenta por cento centrais dos dados e deixa de fora as pontas.</p>
+<p class="narra">Na aula, você vai comparar as duas turmas lado a lado, ver a faixa central dos dados se desenhar, mexer num valor extremo e observar qual medida reage mais, avaliar um relatório que tirou conclusões apressadas, e comparar a dispersão de dois conjuntos de dados seus. Vamos começar?</p>
+      </div></details>
+    </div>
+    <div class="citacao">A amplitude e a amplitude interquartil são medidas de dispersão, que indicam a extensão em que os valores de um conjunto se afastam uns dos outros.<small>TRIOLA, 2017</small></div>
+    <p>Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Explicar por que o centro não basta para descrever os dados</li>
+      <li><span class="n">2</span>Calcular a amplitude total e a amplitude interquartil</li>
+      <li><span class="n">3</span>Avaliar o efeito de valores extremos em cada medida</li>
+      <li><span class="n">4</span>Ler centro e dispersão juntos</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>A mesma média, histórias diferentes</h2>
+    <div class="abas">
+      <button class="on" data-aba="a1">Duas turmas</button>
+      <button data-aba="a2">Preço do combustível</button>
+      <button data-aba="a3">Um atendimento demorado</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>A <b>Turma A</b> tirou 5, 6, 6, 6 e 7. A <b>Turma B</b> tirou 2, 4, 6, 8 e 10. Em ambas, a média é 6.</p>
+      <div id="fig9"></div>
+      <p class="fonte">Figura 9 – Notas das Turmas A e B: mesma média, dispersões diferentes (dados fictícios). Fonte: elaboração do autor.</p>
+      <p>Na Turma A, as notas se concentram em torno do 6; na B, espalham-se de 2 a 10. A diferença é visível à primeira vista. Para descrevê-la com números, usamos as medidas desta lição.</p>
+    </div>
+    <div class="painel" id="a2">
+      <p>O mesmo combustível foi encontrado em quatro postos, por <b>R$ 5,79; R$ 5,89; R$ 5,99 e R$ 6,09</b> o litro.</p>
+      <div id="combGraf"></div>
+      <p>A diferença entre o preço mais alto e o mais baixo é de <b>R$ 0,30</b>: os preços estão bastante próximos entre si. Quanto maior essa diferença, maior a variação percebida pelo consumidor.</p>
+    </div>
+    <div class="painel" id="a3">
+      <p>Seis atendimentos duraram <b>10, 11, 12, 12, 13 e 14</b> minutos. A diferença entre o maior e o menor tempo é de 4 minutos.</p>
+      <label class="chk"><input type="checkbox" id="at40"> Acrescentar um sétimo atendimento, de 40 minutos</label>
+      <div id="atGraf"></div>
+      <p id="atMsg"></p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. AMPLITUDE TOTAL -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Amplitude total</div>
+    <h2>R = valor máximo − valor mínimo</h2>
+    <div class="cartoes">
+      <button class="cartao"><div class="giro"><div class="face frente">O que ela indica?<small>Clique para virar</small></div><div class="face verso">A extensão completa dos dados. É simples de calcular e de interpretar.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Qual o ponto fraco?<small>Clique para virar</small></div><div class="face verso">Depende de apenas dois valores e ignora todos os demais. Por isso, é muito sensível a valores extremos.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">E em dados agrupados?<small>Clique para virar</small></div><div class="face verso">Estimada pela diferença entre o limite superior da última classe e o limite inferior da primeira. O resultado é aproximado.</div></div></button>
+    </div>
+    <div class="questao" data-q="r">
+      <div class="enunciado">O preço de um produto em seis lojas foi, em reais: 19,90; 21,50; 18,75; 22,00; 20,40 e 19,10. Qual é a amplitude total?</div>
+      <button class="opcao"><span class="radio"></span>R$ 2,10</button>
+      <button class="opcao" data-certa><span class="radio"></span>R$ 3,25</button>
+      <button class="opcao"><span class="radio"></span>R$ 0,80</button>
+      <button class="opcao"><span class="radio"></span>R$ 22,00</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. O maior preço é R$ 22,00 e o menor, R$ 18,75: R = 22,00 − 18,75 = R$ 3,25, a variação de preço entre as lojas pesquisadas." data-nao="Ainda não. Encontre o maior (R$ 22,00) e o menor (R$ 18,75) preço, sem se prender à ordem em que aparecem: R = 22,00 − 18,75 = R$ 3,25."></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3" data-trava="r">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 3. AIQ -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Amplitude interquartil</div>
+    <h2>AIQ = Q3 − Q1: a faixa dos 50% centrais</h2>
+    <p>Os 25% menores e os 25% maiores ficam de fora, o que faz da AIQ uma medida mais estável que a amplitude total. Escolha a turma e acompanhe o cálculo pela mediana das metades.</p>
+    <div class="controles"><button class="btn-sec on-p" id="vTA">Turma A</button><button class="btn-sec" id="vTB">Turma B</button></div>
+    <div id="aiqGraf"></div>
+    <div class="formula" id="aiqCalc"></div>
+    <h3 style="margin-top:24px">Tabela 6</h3>
+    <table class="freq">
+      <tr><th>Medida</th><th>Turma A</th><th>Turma B</th></tr>
+      <tr><td>Média</td><td>6</td><td>6</td></tr>
+      <tr><td>Amplitude total (R)</td><td>2</td><td>8</td></tr>
+      <tr><td>Q1</td><td>5,5</td><td>3</td></tr>
+      <tr><td>Q3</td><td>6,5</td><td>9</td></tr>
+      <tr class="pisca"><td>Amplitude interquartil (AIQ)</td><td>1</td><td>6</td></tr>
+    </table>
+    <p class="fonte">Tabela 6 – Medidas de centro e de dispersão das notas das Turmas A e B (dados fictícios). Fonte: elaboração do autor.</p>
+    <div class="citacao">Se um gestor olhar apenas para a média, concluirá que as duas turmas são iguais. Ao considerar a dispersão, percebe que a Turma B exige um tratamento diferente, com atenção aos alunos nos extremos. Centro e dispersão devem ser lidos juntos.</div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4" data-trava="tb">Continuar</button><div class="dica-trava">Veja as duas turmas para continuar</div></div>
+</section>
+
+<!-- 4. EXTREMO -->
+<section class="secao" data-s="4">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Efeito de um valor extremo</div>
+    <h2>Qual medida reage mais?</h2>
+    <p>As notas <b>4, 5, 5, 6 e 7</b>. Arraste o controle para trocar a nota 7 por um valor maior e compare as duas medidas.</p>
+    <div class="painel-calc">
+      <label for="extV">Maior nota: <b id="extVal">7</b></label>
+      <input type="range" id="extV" min="7" max="30" value="7">
+      <div id="extGraf"></div>
+      <div class="caixas">
+        <div class="caixa destaque-cx"><span>Amplitude total (R)</span><b id="extR">3</b></div>
+        <div class="caixa"><span>Amplitude interquartil (AIQ)</span><b id="extA">2</b></div>
+      </div>
+      <p id="extMsg" class="fonte"></p>
+    </div>
+    <div class="acordeao">
+      <details><summary>Por que a AIQ também mudou?</summary><div class="corpo"><p>Com só cinco notas, o valor extremo entra na metade superior (6 e o extremo), e Q3 sobe junto. A amplitude total foi mais afetada, mas a AIQ também mudou. Com mais observações, a AIQ tenderia a ser menos afetada. Veja no Exemplo 3: com sete atendimentos, o de 40 minutos fez a amplitude saltar de 4 para 30, mas a AIQ, pela mediana das metades, foi só de 2 para 3 minutos.</p></div></details>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="5" data-trava="ext">Continuar</button><div class="dica-trava">Leve a maior nota até 27 para continuar</div></div>
+</section>
+
+<!-- 5. CRÍTICA -->
+<section class="secao" data-s="5">
+  <div class="bloco">
+    <div class="rotulo">Interpretação crítica</div>
+    <h2>Um relatório apressado</h2>
+    <p>Um relatório afirma que as notas de uma turma de dez alunos são homogêneas, pois a amplitude é de apenas 3 pontos. As notas são: <b>1, 7, 8, 8, 8, 9, 9, 9, 10 e 10</b>.</p>
+    <div id="relGraf"></div>
+    <div class="caixas">
+      <div class="caixa destaque-cx"><span>Amplitude total</span><b>10 − 1 = 9</b></div>
+      <div class="caixa"><span>Q1 · Q3</span><b>8 · 9</b></div>
+      <div class="caixa"><span>AIQ</span><b>9 − 8 = 1</b></div>
+    </div>
+    <div class="questao" data-q="rel">
+      <div class="enunciado">Como avaliar a afirmação do relatório?</div>
+      <button class="opcao"><span class="radio"></span>Está correta: a amplitude é 3 e as notas são homogêneas</button>
+      <button class="opcao"><span class="radio"></span>Está errada: as notas são muito dispersas em toda a turma</button>
+      <button class="opcao" data-certa><span class="radio"></span>A amplitude é 9, não 3. Os 50% centrais são homogêneos (AIQ = 1), mas há um aluno muito distante. O relatório deveria informar as duas medidas</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Isso mesmo. A amplitude total é 9 por causa da nota 1. A AIQ = 1 mostra que a parte central da turma é muito próxima, mas a amplitude revela um aluno distante dos demais. Uma medida sozinha conta só parte da história." data-nao="Não é essa. Calcule as duas medidas: R = 10 − 1 = 9 (e não 3), e AIQ = 9 − 8 = 1. A parte central é homogênea, mas existe um aluno com nota muito distante. O relatório deveria informar as duas."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="6" data-trava="rel">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 6. VANTAGENS -->
+<section class="secao" data-s="6">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Vantagens e limitações</div>
+    <h2>Amplitude total ou AIQ?</h2>
+    <p>Arraste cada característica para a medida a que ela se refere.</p>
+    <p class="fonte">No celular, toque na característica e depois toque na coluna.</p>
+    <div class="dd-banco" id="dd1Banco"></div>
+    <div class="dd-zonas" id="dd1Zonas" style="grid-template-columns:1fr 1fr">
+      <div class="dd-zona" data-z="r"><h4>Amplitude total (R)</h4></div>
+      <div class="dd-zona" data-z="a"><h4>Amplitude interquartil (AIQ)</h4></div>
+    </div>
+    <div class="dd-msg" id="dd1Msg"></div>
+    <div class="citacao" id="ddConc" style="display:none">Nenhuma das duas considera a distância de cada valor em relação ao centro. Essa lacuna será preenchida pela <b>variância</b> e pelo <b>desvio padrão</b>, nas próximas lições.</div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="7" data-trava="dd1">Continuar</button><div class="dica-trava">Classifique todas as características para continuar</div></div>
+</section>
+
+<!-- 7. LABORATÓRIO -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">Compare a dispersão de dois conjuntos</h3>
+      <p>Digite um ou dois conjuntos (vírgula para decimais; espaço ou ponto e vírgula para separar). A aula calcula média, amplitude total e AIQ e mostra os dois lado a lado.</p>
+    </div>
+    <div class="dois-campos">
+      <div><label>Conjunto 1</label><textarea id="lab1" rows="2" placeholder="Ex.: 5 6 6 6 7"></textarea></div>
+      <div><label>Conjunto 2 (opcional)</label><textarea id="lab2" rows="2" placeholder="Ex.: 2 4 6 8 10"></textarea></div>
+    </div>
+    <div class="erro-txt" id="labErro"></div>
+    <div class="controles">
+      <button class="btn-sec" id="labGerar">Comparar</button>
+      <button class="btn-sec" id="labEx">Exemplo: Turmas A e B</button>
+    </div>
+    <div id="labTab"></div>
+    <div id="labGraf"></div>
+    <p id="labMsg"></p>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8">Continuar</button></div>
+</section>
+
+<!-- 8. RESUMO -->
+<section class="secao" data-s="8">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="cartoes quatro">
+      <button class="cartao"><div class="giro"><div class="face frente">Por que medir dispersão<small>Clique para virar</small></div><div class="face verso">Conjuntos com a mesma média podem ser muito diferentes.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Amplitude total<small>Clique para virar</small></div><div class="face verso">Máximo − mínimo. Simples, mas muito sensível a extremos.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">AIQ<small>Clique para virar</small></div><div class="face verso">Q3 − Q1. Descreve os 50% centrais e é mais robusta.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">A regra<small>Clique para virar</small></div><div class="face verso">Centro e dispersão devem ser lidos juntos.</div></div></button>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="9">Ir para o quiz</button></div>
+</section>
+
+<!-- 9. QUIZ -->
+<section class="secao" data-s="9">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 8 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões baseadas nos exercícios do Capítulo 8.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=10, CHAVE="decastro-estat-l8", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+function curto(v){ var s=br(v,2); return s.replace(/,00$/,"").replace(/(,\d)0$/,"$1"); }
+function med(o){ var n=o.length; return n%2 ? o[(n-1)/2] : (o[n/2-1]+o[n/2])/2; }
+function medidas(d){ var o=d.slice().sort(function(a,b){return a-b;}), n=o.length, h=Math.floor(n/2), inf=o.slice(0,h), sup=o.slice(n%2?h+1:h);
+  return {o:o,n:n,min:o[0],max:o[n-1],R:o[n-1]-o[0],q1:med(inf),q2:med(o),q3:med(sup),aiq:med(sup)-med(inf),media:o.reduce(function(a,b){return a+b;},0)/n,inf:inf,sup:sup}; }
+var LAR="#E4572E", CLARO="#F6B9A4", TINTA="#1F2933", VERDE="#2F9E6E", AZUL="#3E6FB0";
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao"));
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* gráfico de pontos com faixas R e AIQ; aceita vários conjuntos (linhas) */
+function pontos(linhas, o){
+  o=o||{}; var W=560, lh=o.alto||86, top=o.media?20:(o.R||o.aiq?14:6), H=top+linhas.length*lh+34, x0=o.rotulo?92:30, x1=536;
+  var todos=[]; linhas.forEach(function(l){ todos=todos.concat(l.d); });
+  var mn=o.min!==undefined?o.min:Math.min.apply(null,todos), mx=o.max!==undefined?o.max:Math.max.apply(null,todos); if(mx===mn){mx+=1;mn-=1;}
+  function X(v){return x0+(x1-x0)*(v-mn)/(mx-mn);}
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Valores em pontos'+(o.R?', com amplitude total':'')+(o.aiq?' e amplitude interquartil':'')+'">'];
+  linhas.forEach(function(l,li){ var y0=top+li*lh, base=y0+lh-26, m=medidas(l.d), cor=l.cor||LAR;
+    if(o.rotulo) s.push('<text x="8" y="'+(base-8)+'" font-size="13" font-weight="700" fill="'+TINTA+'">'+l.nome+'</text>');
+    if(o.aiq) s.push('<rect x="'+X(m.q1)+'" y="'+(y0+10)+'" width="'+Math.max(2,X(m.q3)-X(m.q1))+'" height="'+(base-y0-6)+'" fill="'+VERDE+'" opacity=".14"/><line x1="'+X(m.q1)+'" x2="'+X(m.q1)+'" y1="'+(y0+10)+'" y2="'+(base+4)+'" stroke="'+VERDE+'" stroke-width="1.5"/><line x1="'+X(m.q3)+'" x2="'+X(m.q3)+'" y1="'+(y0+10)+'" y2="'+(base+4)+'" stroke="'+VERDE+'" stroke-width="1.5"/><text x="'+((X(m.q1)+X(m.q3))/2)+'" y="'+(y0+22)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+VERDE+'">AIQ = '+curto(m.aiq)+'</text>');
+    if(o.R) s.push('<line x1="'+X(m.min)+'" x2="'+X(m.max)+'" y1="'+(base+12)+'" y2="'+(base+12)+'" stroke="'+LAR+'" stroke-width="2"/><line x1="'+X(m.min)+'" x2="'+X(m.min)+'" y1="'+(base+7)+'" y2="'+(base+17)+'" stroke="'+LAR+'" stroke-width="2"/><line x1="'+X(m.max)+'" x2="'+X(m.max)+'" y1="'+(base+7)+'" y2="'+(base+17)+'" stroke="'+LAR+'" stroke-width="2"/><text x="'+Math.min(x1-30,Math.max(x0+30,(X(m.min)+X(m.max))/2))+'" y="'+(base+28)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+LAR+'">R = '+curto(m.R)+'</text>');
+    s.push('<line x1="'+x0+'" x2="'+x1+'" y1="'+base+'" y2="'+base+'" stroke="#CBD2D9"/>');
+    var pilha={}, cont={}, mxp=1; l.d.forEach(function(v){ var k=Math.round(X(v)/7); cont[k]=(cont[k]||0)+1; mxp=Math.max(mxp,cont[k]); }); var dy=Math.min(13,(base-y0-30)/mxp);
+    l.d.forEach(function(v){ var k=Math.round(X(v)/7), h=pilha[k]||0; pilha[k]=h+1; s.push('<circle cx="'+X(v)+'" cy="'+(base-7-h*dy)+'" r="6" fill="'+cor+'"><title>'+(o.fmt?o.fmt(v):curto(v))+'</title></circle>'); });
+    if(o.media) s.push('<path d="M'+X(m.media)+' '+(base+2)+' l-6 10 h12 z" fill="'+TINTA+'"><title>média '+curto(m.media)+'</title></path>');
+  });
+  var yb=top+linhas.length*lh-26;
+  (o.ticks||[]).forEach(function(t){ s.push('<text x="'+X(t)+'" y="'+(H-4)+'" font-size="11" text-anchor="middle" fill="#7B8794">'+(o.fmt?o.fmt(t):curto(t))+'</text>'); });
+  if(o.media) s.push('<text x="'+x1+'" y="12" font-size="11" text-anchor="end" fill="'+TINTA+'">▲ média</text>');
+  return s.join("")+'</svg>';
+}
+function faixa(a,b,p){ var t=[]; for(var v=a; v<=b+1e-9; v+=p) t.push(+v.toFixed(6)); return t; }
+
+/* exemplos */
+document.getElementById("fig9").innerHTML=pontos([{nome:"Turma A",d:[5,6,6,6,7]},{nome:"Turma B",d:[2,4,6,8,10],cor:AZUL}],{rotulo:true,media:true,min:0,max:10,ticks:faixa(0,10,1)});
+document.getElementById("combGraf").innerHTML=pontos([{d:[5.79,5.89,5.99,6.09]}],{R:true,min:5.7,max:6.2,ticks:[5.7,5.8,5.9,6,6.1,6.2],fmt:function(v){return "R$ "+br(v,2);}});
+var at40=document.getElementById("at40");
+function atend(){ var d=[10,11,12,12,13,14]; if(at40.checked) d.push(40); var m=medidas(d);
+  document.getElementById("atGraf").innerHTML=pontos([{d:d}],{R:true,aiq:true,min:8,max:42,ticks:faixa(10,40,5)});
+  document.getElementById("atMsg").innerHTML = at40.checked ? "A amplitude salta para <b>40 − 10 = 30 minutos</b>, embora seis dos sete atendimentos continuem entre 10 e 14 minutos. A amplitude total é muito sensível a um único valor extremo. (A faixa verde, a AIQ, que veremos adiante, só passa de 2 para 3 minutos.)" : "Amplitude: 14 − 10 = <b>4 minutos</b>."; }
+at40.addEventListener("change", atend); atend();
+
+/* AIQ turmas */
+var vista="A", vistas={A:false,B:false};
+function turmas(){ var d=vista==="A"?[5,6,6,6,7]:[2,4,6,8,10], m=medidas(d);
+  document.getElementById("aiqGraf").innerHTML=pontos([{nome:"Turma "+vista,d:d,cor:vista==="A"?LAR:AZUL}],{R:true,aiq:true,min:0,max:10,ticks:faixa(0,10,1),alto:110});
+  document.getElementById("aiqCalc").innerHTML="Ordenado: "+d.join(", ")+" · mediana = "+curto(m.q2)+" (fica fora das metades)<br>Metade inferior: "+m.inf.join(" e ")+" → <b>Q1 = "+curto(m.q1)+"</b> · Metade superior: "+m.sup.join(" e ")+" → <b>Q3 = "+curto(m.q3)+"</b><br><b>AIQ = "+curto(m.q3)+" − "+curto(m.q1)+" = "+curto(m.aiq)+"</b> · R = "+m.max+" − "+m.min+" = "+m.R;
+  vistas[vista]=true; if(vistas.A&&vistas.B) liberar("tb"); }
+document.getElementById("vTA").addEventListener("click", function(){ vista="A"; this.classList.add("on-p"); document.getElementById("vTB").classList.remove("on-p"); turmas(); });
+document.getElementById("vTB").addEventListener("click", function(){ vista="B"; this.classList.add("on-p"); document.getElementById("vTA").classList.remove("on-p"); turmas(); });
+turmas();
+
+/* extremo */
+var eV=document.getElementById("extV");
+function extremo(){ var v=+eV.value, d=[4,5,5,6,v], m=medidas(d);
+  document.getElementById("extVal").textContent=v; document.getElementById("extR").textContent=curto(m.R); document.getElementById("extA").textContent=curto(m.aiq);
+  document.getElementById("extGraf").innerHTML=pontos([{d:d}],{R:true,aiq:true,min:0,max:30,ticks:faixa(0,30,5),alto:110});
+  document.getElementById("extMsg").innerHTML = v===7 ? "Com 4, 5, 5, 6 e 7: R = 3 e AIQ = 6,5 − 4,5 = 2." : "R passou de 3 para <b>"+curto(m.R)+"</b> (+"+curto(m.R-3)+"); a AIQ passou de 2 para <b>"+curto(m.aiq)+"</b> (+"+curto(m.aiq-2)+")."+(v===27?" Exatamente o Exercício 3 do livro: R = 23 e AIQ = 16,5 − 4,5 = 12.":"");
+  if(v>=27) liberar("ext"); }
+eV.addEventListener("input", extremo); extremo();
+
+/* relatório */
+document.getElementById("relGraf").innerHTML=pontos([{d:[1,7,8,8,8,9,9,9,10,10]}],{R:true,aiq:true,min:0,max:10,ticks:faixa(0,10,1),alto:120});
+
+/* arrastar e soltar */
+function montarDD(pref, itens, msgErro, trava, aoFim){
+  var banco=document.getElementById(pref+"Banco"), zonas=document.querySelectorAll("#"+pref+"Zonas .dd-zona"), msg=document.getElementById(pref+"Msg"), rest=itens.length, sel=null;
+  itens.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; banco.appendChild(d); ligar(d); });
+  function soltar(item,zona){ if(!zona) return;
+    if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent="Correto."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Tudo no lugar certo."; liberar(trava); if(aoFim) aoFim(); } }
+    else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent=msgErro; } }
+  function zonaEm(x,y){ var el=document.elementFromPoint(x,y); el=el?el.closest(".dd-zona"):null; return el&&el.parentNode.id===pref+"Zonas"?el:null; }
+  function ligar(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+    el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+      if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+      f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+    el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+      if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+      else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+  }
+  zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+}
+montarDD("dd1",[["A mais simples e intuitiva","r"],["Depende apenas do maior e do menor valor","r"],["Muito sensível a um único valor extremo","r"],["Descreve os 50% centrais dos dados","a"],["Mais robusta a valores extremos","a"],["Usa apenas os quartis","a"]],"Ainda não. Pense: a característica fala dos extremos ou da faixa central?","dd1",function(){ document.getElementById("ddConc").style.display="block"; });
+
+/* laboratório */
+function lerNumeros(txt){ return txt.trim().split(/[\s;]+/).filter(Boolean).map(function(x){return Number(x.replace(/\./g,"").replace(",","."));}); }
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var t1=document.getElementById("lab1").value.trim(), t2=document.getElementById("lab2").value.trim(), conj=[];
+  [[t1,"Conjunto 1"],[t2,"Conjunto 2"]].forEach(function(z){ if(!z[0]) return; var d=lerNumeros(z[0]); conj.push({nome:z[1],d:d}); });
+  if(!conj.length){ erro.textContent="Digite pelo menos um conjunto."; return; }
+  for(var i=0;i<conj.length;i++){ var d=conj[i].d; if(d.length<4){ erro.textContent=conj[i].nome+": digite pelo menos quatro valores."; return; } if(d.some(function(x){return !isFinite(x);})){ erro.textContent=conj[i].nome+": há algum valor que não é número."; return; } if(d.length>300){ erro.textContent=conj[i].nome+": use no máximo 300 valores."; return; } }
+  var ms=conj.map(function(c){return medidas(c.d);});
+  var h='<table class="freq"><tr><th>Medida</th>'+conj.map(function(c){return '<th>'+c.nome+'</th>';}).join("")+'</tr>';
+  [["n","n"],["Média","media"],["Mediana","q2"],["Amplitude total (R)","R"],["Q1","q1"],["Q3","q3"],["AIQ","aiq"]].forEach(function(r){ h+='<tr'+(r[1]==="aiq"||r[1]==="R"?' class="pisca"':'')+'><td>'+r[0]+'</td>'+ms.map(function(m){return '<td>'+curto(m[r[1]])+'</td>';}).join("")+'</tr>'; });
+  document.getElementById("labTab").innerHTML=h+'</table>';
+  var todos=[]; conj.forEach(function(c){todos=todos.concat(c.d);}); var mn=Math.min.apply(null,todos), mx=Math.max.apply(null,todos), pad=(mx-mn)*0.04||1;
+  document.getElementById("labGraf").innerHTML=pontos(conj.map(function(c,i){return {nome:c.nome,d:c.d,cor:i?AZUL:LAR};}),{rotulo:true,R:true,aiq:true,media:true,min:mn-pad,max:mx+pad,ticks:[mn,mx],alto:110});
+  var msg="";
+  if(ms.length===2){ var a=ms[0], b=ms[1], mesmo=Math.abs(a.media-b.media)<=0.05*Math.max(Math.abs(a.media),Math.abs(b.media),1e-9);
+    msg=(mesmo?"As médias são praticamente iguais, mas ":"")+(a.aiq<b.aiq?"o Conjunto 1 é mais homogêneo na parte central (AIQ menor)":a.aiq>b.aiq?"o Conjunto 2 é mais homogêneo na parte central (AIQ menor)":"os dois têm a mesma AIQ")+". "+((a.R<b.R)!==(a.aiq<b.aiq)&&a.R!==b.R&&a.aiq!==b.aiq?"Repare que a amplitude total aponta na direção contrária: há valores extremos fazendo diferença.":""); }
+  else { var m=ms[0]; msg = m.R>3*m.aiq&&m.aiq>0 ? "A amplitude total é bem maior que a AIQ: a parte central é compacta, mas há valores distantes nas pontas." : "Amplitude total e AIQ contam histórias parecidas: não há extremos muito destacados."; }
+  document.getElementById("labMsg").textContent=msg;
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.getElementById("labEx").addEventListener("click", function(){ document.getElementById("lab1").value="5 6 6 6 7"; document.getElementById("lab2").value="2 4 6 8 10"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"Para os valores 1, 3, 4, 6, 8, 9 e 12, quanto vale a amplitude interquartil (mediana das metades)?", o:["11","6","5","9"], c:1, x:"n = 7; a mediana (6) fica fora das metades. Inferior 1, 3, 4 → Q1 = 3. Superior 8, 9, 12 → Q3 = 9. AIQ = 9 − 3 = 6."},
+ {e:"As notas 4, 5, 5, 6 e 7 têm R = 3 e AIQ = 2. Trocando 7 por 27, quais ficam R e AIQ?", o:["R = 23; AIQ = 2","R = 23; AIQ = 12","R = 3; AIQ = 12","R = 27; AIQ = 16,5"], c:1, x:"R = 27 − 4 = 23. A metade superior vira 6 e 27, com Q3 = 16,5, e AIQ = 16,5 − 4,5 = 12. A amplitude foi mais afetada, mas a AIQ também mudou, pois o extremo está na metade superior."},
+ {e:"Dois conjuntos têm média 50. X tem amplitude total 10; Y, 60. Qual é mais homogêneo?", o:["Y, porque tem mais variação","X, porque seus valores ficam mais próximos da média","Os dois, porque a média é igual","Não é possível dizer nada"], c:1, x:"Com a mesma média, a diferença está na dispersão: X tem amplitude menor, e seus valores se concentram mais perto de 50. Para uma comparação mais precisa, vale olhar também a AIQ e, adiante, o desvio padrão."},
+ {e:"Notas: 1, 7, 8, 8, 8, 9, 9, 9, 10 e 10. Quais são a amplitude total e a AIQ?", o:["R = 3; AIQ = 1","R = 9; AIQ = 1","R = 9; AIQ = 3","R = 10; AIQ = 2"], c:1, x:"R = 10 − 1 = 9. Metade inferior 1, 7, 8, 8, 8 → Q1 = 8; superior 9, 9, 9, 10, 10 → Q3 = 9. AIQ = 1: o centro é homogêneo, mas há um aluno muito distante."},
+ {e:"Qual limitação as duas medidas desta lição compartilham?", o:["Não podem ser calculadas com números decimais","Nenhuma considera a distância de cada valor em relação ao centro","As duas são sempre iguais","As duas exigem dados agrupados"], c:1, x:"A amplitude usa só os extremos; a AIQ, só os quartis. Nenhuma olha para a distância de cada valor até o centro, lacuna preenchida pela variância e pelo desvio padrão."}
+];
+var qi=0, acq=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+acq+'/'+QUIZ.length+'</div><p>'+(acq>=4?"Excelente! Você está pronto para a Lição 9.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;acq=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+acq+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) acq++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

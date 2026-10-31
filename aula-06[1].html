@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 6 – Mediana: o valor central | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+
+.palpites{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.btn-sec.on-p{background:var(--laranja);color:#fff}
+.tipos-moda{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+.tipos-moda div{background:var(--fundo);border-top:3px solid var(--laranja);border-radius:4px;padding:14px;text-align:center}
+.tipos-moda b{display:block;color:var(--tinta);font-size:16px}
+.tipos-moda span{font-size:12px;color:var(--cinza)}
+@media (max-width:860px){.tipos-moda{grid-template-columns:1fr 1fr}}
+
+table.editavel input{width:70px;padding:6px 8px;font-size:15px;border:1px solid var(--linha);border-radius:4px;text-align:center;font-family:inherit}
+table.editavel input:focus{outline:2px solid var(--laranja);border-color:transparent}
+#tabDesv th{font-size:12px}
+#tabDesv td,#tabDesv th{padding:8px 6px}
+@media (max-width:860px){#tabDesv{font-size:13px}}
+
+.fila{position:relative;height:78px;margin:16px 0 8px;overflow:hidden}
+.ficha-f{position:absolute;left:0;top:20px;height:44px;display:grid;place-items:center;background:#fff;border:1px solid var(--linha);border-radius:6px;font-weight:700;color:var(--tinta);font-size:15px;transition:transform .7s cubic-bezier(.4,1.3,.5,1),background .3s,color .3s;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.ficha-f::before{content:attr(data-pos);position:absolute;top:-19px;font-size:11px;color:var(--cinza);font-weight:400}
+.ficha-f.centro{background:var(--verde);color:#fff;border-color:var(--verde)}
+.ficha-f.alterado{outline:2px dashed var(--laranja);outline-offset:2px}
+.treino-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza)}
+input.resp{width:120px;padding:10px 12px;font-size:16px;border:1px solid var(--linha);border-radius:6px;font-family:inherit}
+input.resp:focus{outline:2px solid var(--laranja);border-color:transparent}
+.dois-lados{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:10px}
+.lado{border:1px solid var(--linha);border-radius:6px;padding:20px;background:#fff}
+.lado.on-lado{border:2px solid var(--laranja);background:var(--laranja-claro)}
+.lado p{font-size:16px;margin:0}
+.lado h3{margin:0 0 8px}
+.icone{font-size:34px;margin-bottom:6px}
+.passo2{display:none}.passo2.on{display:block;animation:surgir .4s}
+.passo2 h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo2 p{font-size:16px}
+@media (max-width:860px){.dois-lados{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-aula="aula06">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 6 · Mediana: o valor central</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="feita"><span class="num">✓</span>Representando dados com gráficos</li>
+    <li class="feita"><span class="num">✓</span>Moda: o valor que mais se repete</li>
+    <li class="feita"><span class="num">✓</span>Média aritmética: o ponto de equilíbrio</li>
+    <li class="ativa"><span class="num">6</span>Mediana: o valor central</li>
+    <li><span class="num">7</span>Quartis, decis e percentis<span class="cad">🔒</span></li>
+    <li><span class="num">8</span>Amplitude e amplitude interquartil<span class="cad">🔒</span></li>
+    <li><span class="num">9</span>Variância<span class="cad">🔒</span></li>
+    <li><span class="num">10</span>Desvio padrão<span class="cad">🔒</span></li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 6 de 12 · Onde fica o centro dos dados?</div>
+    <h2>Mediana: o valor central</h2>
+    <p style="color:#E4E7EB">Mediana em dados ordenados e agrupados; média × mediana</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 6</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 6, que fecha o bloco sobre o centro dos dados. Na lição anterior, vimos um problema sério: um único salário muito alto puxou a média para longe da realidade da maioria. Cinco salários, quatro deles entre dois mil e dois mil e oitocentos reais, e uma média de sete mil e novecentos. Quem lê esse número sem ver os dados é enganado.</p>
+<p class="narra">A alternativa é natural. Em vez de somar todos os valores, colocamos os dados em ordem e procuramos o valor que está no meio. Essa é a mediana. No exemplo dos salários, ela é dois mil e quinhentos reais, um valor que descreve bem a maioria. E, se o salário mais alto subir ainda mais, a mediana não se mexe.</p>
+<p class="narra">Pense em sete amigos em fila, do mais novo ao mais velho. O quarto da fila deixa três pessoas de cada lado: a idade dele é a mediana. E se o número de pessoas for par? Aí não existe um único valor do meio, e a mediana é a média dos dois valores centrais.</p>
+<p class="narra">Nesta lição, você também vai voltar às classes da Lição 2 para estimar a mediana de dados agrupados, usando a frequência acumulada. E vai entender por que, em estatísticas de renda, de preços de imóveis e de tempos de espera, a mediana costuma descrever melhor a situação típica do que a média.</p>
+<p class="narra">Na aula, você vai ordenar valores e ver o centro aparecer, treinar com conjuntos sorteados, acrescentar um valor extremo e comparar o que acontece com a média e com a mediana, e analisar os seus próprios dados. Vamos começar?</p>
+      </div></details>
+    </div>
+    <div class="citacao">A mediana é o valor que divide um conjunto ordenado de dados em duas partes com a mesma quantidade de observações.<small>TRIOLA, 2017</small></div>
+    <p>Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Encontrar a mediana com número ímpar ou par de valores</li>
+      <li><span class="n">2</span>Explicar por que a mediana resiste a valores extremos</li>
+      <li><span class="n">3</span>Estimar a mediana de dados agrupados</li>
+      <li><span class="n">4</span>Comparar média e mediana para ler a forma dos dados</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Quem está no meio?</h2>
+    <div class="abas">
+      <button class="on" data-aba="a1">Idades dos amigos</button>
+      <button data-aba="a2">Vendas de seis meses</button>
+      <button data-aba="a3">Salários</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Sete amigos têm as seguintes idades. Clique em <b>Ordenar</b> para colocá-los em fila, do mais novo ao mais velho.</p>
+      <div class="fila" id="filaAmigos"></div>
+      <div class="controles"><button class="btn-sec" id="ordAmigos">Ordenar</button><button class="btn-sec" id="troca60">Trocar 30 por 60 anos</button><button class="btn-sec" id="resetAmigos">Recomeçar</button></div>
+      <p id="amigosMsg" class="fonte">Na ordem em que foram informadas, as idades não revelam o centro.</p>
+    </div>
+    <div class="painel" id="a2">
+      <p>Uma loja registrou as vendas de seis meses, em milhares de reais. Clique em <b>Ordenar</b>.</p>
+      <div class="fila" id="filaVendas"></div>
+      <div class="controles"><button class="btn-sec" id="ordVendas">Ordenar</button></div>
+      <p id="vendasMsg" class="fonte">Com seis valores, não existe um único valor central.</p>
+    </div>
+    <div class="painel" id="a3">
+      <p>Os cinco salários da Lição 5: <b>R$ 2.000, R$ 2.200, R$ 2.500, R$ 2.800 e R$ 30.000</b>. Já estão em ordem; a mediana é o terceiro valor, <b>R$ 2.500</b>, que descreve bem a maioria. A média de R$ 7.900 foi puxada pelo salário de R$ 30.000.</p>
+      <div id="fig7"></div>
+      <p class="fonte">Figura 7 – Salários de cinco pessoas: a mediana (linha contínua) e a média (linha tracejada) (dados fictícios). Fonte: elaboração do autor.</p>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. PROCEDIMENTO -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Definição e procedimento</div>
+    <h2>A mediana (Md) em três passos</h2>
+    <div class="passos" id="passos">
+      <span class="etq" id="passoEtq">Passo 1</span>
+      <div class="passo on"><div class="icone">↕️</div><h3>Ordene os valores</h3><p>Do menor para o maior. Sem ordenar, não há “meio”.</p></div>
+      <div class="passo"><div class="icone">📍</div><h3>Localize a posição central</h3><p>Se <b>n for ímpar</b>, a posição central é <b>(n + 1) / 2</b>.<br>Se <b>n for par</b>, há duas posições centrais: <b>n / 2</b> e <b>(n / 2) + 1</b>.</p></div>
+      <div class="passo"><div class="icone">🎯</div><h3>Identifique o valor</h3><p>Com n ímpar, a mediana é o valor na posição central. Com n par, é a <b>média dos dois valores centrais</b>.</p></div>
+      <button class="seta esq" id="pAnt" aria-label="Passo anterior" disabled>‹</button>
+      <button class="seta dir" id="pProx" aria-label="Próximo passo">›</button>
+      <div class="pontos" id="pPontos"><span class="on">1</span><span>2</span><span>3</span></div>
+    </div>
+    <div class="acordeao" style="margin-top:24px">
+      <details><summary>A mediana e as duas metades</summary><div class="corpo"><p>A mediana divide o conjunto em duas metades de mesmo tamanho. Ela é o <b>segundo quartil</b>, o ponto que separa os 50% menores dos 50% maiores. Os quartis serão estudados na Lição 7.</p></div></details>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3">Continuar</button></div>
+</section>
+
+<!-- 3. TREINO -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Treino</div>
+    <h2>Encontre a mediana</h2>
+    <p>Um conjunto é sorteado a cada rodada. Digite a mediana e confira. Acerte três para continuar.</p>
+    <div class="painel-calc">
+      <div class="treino-topo"><span id="treinoN">Rodada 1</span><span id="treinoAc">Acertos: 0 de 3</span></div>
+      <div class="fila" id="treinoFila"></div>
+      <div class="controles" style="align-items:center">
+        <input type="text" inputmode="decimal" id="treinoResp" class="resp" placeholder="Md = ?" aria-label="Sua resposta para a mediana">
+        <button class="btn-sec" id="treinoConf">Conferir</button>
+        <button class="btn-sec" id="treinoOrd">Mostrar ordenado</button>
+        <button class="btn-sec" id="treinoNovo">Novo conjunto</button>
+      </div>
+      <div class="retorno" id="treinoMsg"></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4" data-trava="treino">Continuar</button><div class="dica-trava">Acerte três medianas para continuar</div></div>
+</section>
+
+<!-- 4. RESISTÊNCIA -->
+<section class="secao" data-s="4">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Resistência a valores extremos</div>
+    <h2>Acrescente um valor extremo</h2>
+    <p>Com os valores <b>5, 7, 9 e 11</b>, a mediana e a média valem 8. Ligue o quinto valor e arraste-o para a direita.</p>
+    <div class="painel-calc">
+      <label class="chk"><input type="checkbox" id="extOn"> Acrescentar um quinto valor</label>
+      <label for="extV" style="display:block;margin-top:10px">Quinto valor: <b id="extVal">12</b></label>
+      <input type="range" id="extV" min="12" max="120" value="12" disabled>
+      <div id="extGrafico"></div>
+      <div class="caixas">
+        <div class="caixa destaque-cx"><span>Mediana</span><b id="extMd">8</b></div>
+        <div class="caixa"><span>Média</span><b id="extMe">8</b></div>
+      </div>
+      <p class="fonte" id="extMsg"></p>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="5" data-trava="ext">Continuar</button><div class="dica-trava">Acrescente o quinto valor e leve-o até 100 para continuar</div></div>
+</section>
+
+<!-- 5. AGRUPADOS -->
+<section class="secao" data-s="5">
+  <div class="bloco">
+    <div class="rotulo">Mediana em dados agrupados</div>
+    <h2>A classe mediana e a frequência acumulada</h2>
+    <p>Sem os valores individuais, primeiro localizamos a <b>classe mediana</b>: a primeira classe cuja frequência acumulada atinge ou ultrapassa n / 2. Depois aplicamos a fórmula:</p>
+    <div class="formula" style="font-size:19px;text-align:center">Md = l + [ (n / 2 − F<sub>ant</sub>) / f<sub>md</sub> ] · h<br><small style="font-size:14px;color:var(--texto)">l = limite inferior da classe mediana · F<sub>ant</sub> = acumulada da classe anterior · f<sub>md</sub> = frequência da classe mediana · h = amplitude</small></div>
+    <p>Acompanhe com a Tabela 2 da Lição 2 (n = 20).</p>
+    <div class="passos" id="passos2">
+      <span class="etq" id="passoEtq2">Passo 1</span>
+      <div class="passo2 on"><h3>Calcule n / 2</h3><div class="formula">n / 2 = 20 / 2 = <b>10</b></div></div>
+      <div class="passo2"><h3>Some as frequências acumuladas</h3><p>As acumuladas são 5, 10, 15, 18 e 20. A primeira que atinge 10 está na classe <b>[13; 19)</b>: é a classe mediana.</p></div>
+      <div class="passo2"><h3>Separe os elementos</h3><div class="formula">l = 13 · F<sub>ant</sub> = 5 · f<sub>md</sub> = 5 · h = 6</div></div>
+      <div class="passo2"><h3>Aplique a fórmula</h3><div class="formula">Md = 13 + [(10 − 5) / 5] · 6 = 13 + 6 = <b>19 minutos</b></div></div>
+      <div class="passo2"><h3>Compare com os valores originais</h3><p>Com a lista original, a mediana é <b>18,5 minutos</b>: a média entre o 10º valor (18) e o 11º (19). A diferença de meio minuto é o preço de trabalhar com classes: o resultado é uma aproximação.</p></div>
+      <button class="seta esq" id="pAnt2" aria-label="Passo anterior" disabled>‹</button>
+      <button class="seta dir" id="pProx2" aria-label="Próximo passo">›</button>
+      <div class="pontos" id="pPontos2"><span class="on">1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+    </div>
+    <div id="acumGrafico" style="margin-top:20px"></div>
+    <div class="questao" data-q="ag">
+      <div class="enunciado">Consumo de água de 25 unidades: [10; 14) com 4; [14; 18) com 9; [18; 22) com 7; [22; 26) com 5. Qual é a mediana estimada?</div>
+      <button class="opcao"><span class="radio"></span>16 m³, o ponto médio da classe mediana</button>
+      <button class="opcao"><span class="radio"></span>Cerca de 18,08 m³</button>
+      <button class="opcao" data-certa><span class="radio"></span>Cerca de 17,8 m³</button>
+      <button class="opcao"><span class="radio"></span>12,5 m³</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. n / 2 = 12,5. Acumuladas: 4, 13, 20, 25; a classe mediana é [14; 18). Md = 14 + [(12,5 − 4) / 9] · 4 = 14 + 3,78 ≈ 17,8 m³. (18,08 m³ era a média, na Lição 5.)" data-nao="Não é essa. n / 2 = 12,5 é a posição, não a mediana. A primeira acumulada que atinge 12,5 é 13, na classe [14; 18). Com l = 14, F_ant = 4, f_md = 9 e h = 4: Md = 14 + [(12,5 − 4) / 9] · 4 ≈ 17,8 m³."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="6" data-trava="ag">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 6. COMPARAÇÃO -->
+<section class="secao" data-s="6">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Comparação entre média e mediana</div>
+    <h2>Quando elas concordam, e quando se separam</h2>
+    <div class="dois-lados">
+      <div class="lado"><h3>Conjunto simétrico</h3><p>A média e a mediana tendem a coincidir ou a ficar muito próximas.</p></div>
+      <div class="lado on-lado"><h3>Conjunto assimétrico</h3><p>A média se desloca na direção da cauda; a mediana permanece perto da região central.</p></div>
+    </div>
+    <p style="margin-top:18px">Por isso, em estatísticas de <b>renda</b>, de <b>preços de imóveis</b> e de <b>tempos de espera</b>, a mediana costuma descrever melhor a situação típica.</p>
+    <div class="questao" data-q="cmp">
+      <div class="enunciado">Para o conjunto 2, 3, 3, 4 e 20: média = 6,4; mediana = 3; moda = 3. Qual medida descreve melhor o conjunto?</div>
+      <button class="opcao"><span class="radio"></span>A média, porque usa todos os valores</button>
+      <button class="opcao" data-certa><span class="radio"></span>A mediana, porque usa a posição central e não é puxada pelo 20</button>
+      <button class="opcao"><span class="radio"></span>Nenhuma, pois as três são diferentes</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. A média é puxada pelo valor 20 e não representa a maioria. Mediana e moda (ambas 3) descrevem melhor; a mediana é preferível por usar a posição central, sem depender da repetição de um único valor." data-nao="Não é essa. A média de 6,4 é puxada pelo 20 e fica acima de quatro dos cinco valores. A mediana (3) descreve melhor a maioria, por usar a posição central."></div>
+    </div>
+  </div></div>
+  <div class="bloco">
+    <div class="rotulo">Vantagens e limitações</div>
+    <h3>Arraste cada característica para a coluna certa</h3>
+    <p class="fonte">No celular, toque na característica e depois toque na coluna.</p>
+    <div class="dd-banco" id="dd1Banco"></div>
+    <div class="dd-zonas" id="dd1Zonas" style="grid-template-columns:1fr 1fr">
+      <div class="dd-zona" data-z="v"><h4>✓ Vantagem</h4></div>
+      <div class="dd-zona" data-z="l"><h4>⚠ Limitação</h4></div>
+    </div>
+    <div class="dd-msg" id="dd1Msg"></div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="7" data-trava="cmpdd">Continuar</button><div class="dica-trava">Responda a questão e classifique as características para continuar</div></div>
+</section>
+
+<!-- 7. LABORATÓRIO -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">Mediana e média dos seus dados</h3>
+      <p>Digite os valores (vírgula para decimais; espaço ou ponto e vírgula para separar). A aula ordena, mostra o centro, compara com a média e indica para que lado os dados se estendem.</p>
+    </div>
+    <div style="margin-top:20px">
+      <textarea id="labDados" rows="2" placeholder="Ex.: 28 31 25 33 29 27 30"></textarea>
+      <div class="erro-txt" id="labErro"></div>
+      <div class="controles">
+        <button class="btn-sec" id="labGerar">Calcular</button>
+        <button class="btn-sec" id="labEx1">Exemplo: temperaturas</button>
+        <button class="btn-sec" id="labEx2">Exemplo: salários da empresa</button>
+      </div>
+      <div class="fila" id="labFila"></div>
+      <div id="labRes"></div>
+      <div id="labGrafico"></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8">Continuar</button></div>
+</section>
+
+<!-- 8. RESUMO -->
+<section class="secao" data-s="8">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="cartoes quatro">
+      <button class="cartao"><div class="giro"><div class="face frente">O que é<small>Clique para virar</small></div><div class="face verso">O valor central de um conjunto ordenado, que divide os dados em duas metades de mesmo tamanho.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Como se obtém<small>Clique para virar</small></div><div class="face verso">Pela posição central dos valores, e não pelo seu total. Com n par, é a média dos dois centrais.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Dados agrupados<small>Clique para virar</small></div><div class="face verso">Estimada a partir da classe mediana, com a frequência acumulada; o resultado é aproximado.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">Quando usar<small>Clique para virar</small></div><div class="face verso">Resistente a extremos, descreve melhor distribuições assimétricas, como salários e preços. Compare-a com a média.</div></div></button>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="9">Ir para o quiz</button></div>
+</section>
+
+<!-- 9. QUIZ -->
+<section class="secao" data-s="9">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 6 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões sobre o Capítulo 6, a maioria tirada dos exercícios do livro.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=10, CHAVE="decastro-estat-l6", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+function curto(v){ var s=br(v,2); return s.replace(/,00$/,"").replace(/(,\d)0$/,"$1"); }
+function reais(v){ return "R$ "+Math.round(v).toLocaleString("pt-BR"); }
+function mediana(a){ var o=a.slice().sort(function(x,y){return x-y;}), n=o.length; return n%2 ? o[(n-1)/2] : (o[n/2-1]+o[n/2])/2; }
+function media(a){ return a.reduce(function(x,y){return x+y;},0)/a.length; }
+var LAR="#E4572E", CLARO="#F6B9A4", TINTA="#1F2933", VERDE="#2F9E6E";
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao"));
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); window.dispatchEvent(new Event("resize")); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+var duplo={cmp:false,dd:false};
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; if(q.dataset.q==="cmp"){ duplo.cmp=true; if(duplo.dd) liberar("cmpdd"); } else liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* fila animada de valores */
+function fila(el, valores, o){
+  o=o||{}; var ordem=valores.map(function(v,i){return {v:v,i:i};});
+  if(o.ordenar) ordem.sort(function(a,b){return a.v-b.v||a.i-b.i;});
+  var n=valores.length, c=[]; if(o.ordenar){ if(n%2) c=[(n-1)/2]; else c=[n/2-1,n/2]; }
+  var larg=Math.min(70, Math.floor((el.clientWidth||600)/n)-6);
+  el.style.height="78px";
+  if(!el._fichas){ el.innerHTML=""; el._fichas=valores.map(function(v){ var f=document.createElement("div"); f.className="ficha-f"; el.appendChild(f); return f; }); }
+  ordem.forEach(function(o2,pos){ var f=el._fichas[o2.i]; f.textContent=(o.fmt?o.fmt(o2.v):curto(o2.v)); f.style.width=larg+"px"; f.style.transform="translateX("+(pos*(larg+6))+"px)";
+    f.classList.toggle("centro", c.indexOf(pos)>=0); f.classList.toggle("alterado", !!(o.alterado&&o.alterado===o2.i)); f.dataset.pos=o.ordenar?(pos+1)+"º":""; });
+}
+function resetFila(el){ el._fichas=null; }
+
+/* exemplo 1: amigos */
+var AMIGOS=[15,22,18,30,21,19,25], amigos=AMIGOS.slice(), amOrd=false, fA=document.getElementById("filaAmigos");
+function desenharAmigos(){ fila(fA, amigos, {ordenar:amOrd, alterado: amigos[3]===60?3:null});
+  document.getElementById("amigosMsg").innerHTML = !amOrd ? "Na ordem em que foram informadas, as idades não revelam o centro." : (amigos[3]===60 ? "Com 60 anos no lugar de 30, a mediana <b>continua sendo 21 anos</b>: a posição do valor central não mudou." : "Em ordem: 15, 18, 19, 21, 22, 25 e 30. O <b>4º valor, 21 anos</b>, deixa três pessoas de cada lado. Essa é a mediana."); }
+document.getElementById("ordAmigos").addEventListener("click", function(){ amOrd=true; desenharAmigos(); });
+document.getElementById("troca60").addEventListener("click", function(){ amigos[3]=60; amOrd=true; desenharAmigos(); });
+document.getElementById("resetAmigos").addEventListener("click", function(){ amigos=AMIGOS.slice(); amOrd=false; desenharAmigos(); });
+var VENDAS=[10,14,8,12,20,16], fV=document.getElementById("filaVendas"), vOrd=false;
+function desenharVendas(){ fila(fV, VENDAS, {ordenar:vOrd}); if(vOrd) document.getElementById("vendasMsg").innerHTML="Em ordem: 8, 10, 12, 14, 16 e 20. Os dois do meio são 12 e 14: Md = (12 + 14) / 2 = <b>13 mil reais</b>. Metade dos meses fica abaixo e metade acima."; }
+document.getElementById("ordVendas").addEventListener("click", function(){ vOrd=true; desenharVendas(); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ setTimeout(function(){ resetFila(fA); resetFila(fV); desenharAmigos(); desenharVendas(); },30); }); });
+
+/* reta de pontos com média e mediana */
+function reta(valores, o){
+  o=o||{}; var W=560,H=156,x0=34,x1=530, mn=o.min!==undefined?o.min:Math.min.apply(null,valores), mx=o.max!==undefined?o.max:Math.max.apply(null,valores); if(mx===mn){mx+=1;mn-=1;}
+  function X(z){return x0+(x1-x0)*(z-mn)/(mx-mn);}
+  var md=mediana(valores), me=media(valores), s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Valores numa reta, com média e mediana">'];
+  s.push('<line x1="'+x0+'" x2="'+x1+'" y1="90" y2="90" stroke="#9AA5B1" stroke-width="2"/>');
+  (o.ticks||[]).forEach(function(t){ s.push('<line x1="'+X(t[0])+'" x2="'+X(t[0])+'" y1="86" y2="94" stroke="#9AA5B1"/><text x="'+X(t[0])+'" y="110" font-size="11" text-anchor="middle" fill="#7B8794">'+t[1]+'</text>'); });
+  var pilha={}, cont={}, mxP=1; valores.forEach(function(v){ var k=Math.round(X(v)/8); cont[k]=(cont[k]||0)+1; mxP=Math.max(mxP,cont[k]); }); var dy=Math.min(14,64/mxP), rr=Math.min(7,Math.max(3.5,dy/2+1));
+  valores.forEach(function(v){ var k=Math.round(X(v)/8), h=pilha[k]||0; pilha[k]=h+1; s.push('<circle cx="'+X(v)+'" cy="'+(80-h*dy)+'" r="'+rr+'" fill="'+LAR+'" opacity=".85"><title>'+(o.fmt?o.fmt(v):curto(v))+'</title></circle>'); });
+  s.push('<line x1="'+X(md)+'" x2="'+X(md)+'" y1="14" y2="96" stroke="'+VERDE+'" stroke-width="3"/>');
+  s.push('<line x1="'+X(me)+'" x2="'+X(me)+'" y1="14" y2="96" stroke="'+TINTA+'" stroke-width="2.5" stroke-dasharray="6 4"/>');
+  var fm=o.fmt||curto; function cl(x){return Math.max(70,Math.min(W-70,x));}
+  s.push('<text x="'+cl(X(md))+'" y="128" font-size="12" font-weight="700" text-anchor="middle" fill="'+VERDE+'">mediana '+fm(md)+'</text>');
+  s.push('<text x="'+cl(X(me))+'" y="146" font-size="12" font-weight="700" text-anchor="middle" fill="'+TINTA+'">média '+fm(me)+'</text>');
+  return s.join("")+'</svg>';
+}
+document.getElementById("fig7").innerHTML=reta([2000,2200,2500,2800,30000],{min:0,max:32000,fmt:reais,ticks:[[0,"0"],[10000,"10 mil"],[20000,"20 mil"],[30000,"30 mil"]]});
+
+/* passos */
+function montarPassos(sel, etq, ant, prox, pts, rot){
+  var passos=document.querySelectorAll(sel), pontos=document.querySelectorAll(pts+" span"), at=0;
+  function ir(n){ at=n; passos.forEach(function(p,i){p.classList.toggle("on",i===n);}); pontos.forEach(function(p,i){p.classList.toggle("on",i===n);}); document.getElementById(etq).textContent=rot+" "+(n+1); document.getElementById(ant).disabled=n===0; document.getElementById(prox).disabled=n===passos.length-1; }
+  document.getElementById(ant).addEventListener("click", function(){ ir(Math.max(0,at-1)); });
+  document.getElementById(prox).addEventListener("click", function(){ ir(Math.min(passos.length-1,at+1)); });
+  pontos.forEach(function(p,i){ p.style.cursor="pointer"; p.addEventListener("click", function(){ir(i);}); });
+}
+montarPassos(".passo","passoEtq","pAnt","pProx","#pPontos","Passo");
+montarPassos(".passo2","passoEtq2","pAnt2","pProx2","#pPontos2","Passo");
+
+/* treino */
+var tr={rodada:1,ac:0,dados:[],ord:false}, tF=document.getElementById("treinoFila");
+function novoConj(){
+  var n=5+Math.floor(Math.random()*5), d=[]; for(var i=0;i<n;i++) d.push(1+Math.floor(Math.random()*30));
+  tr.dados=d; tr.ord=false; resetFila(tF); fila(tF,d,{});
+  document.getElementById("treinoN").textContent="Rodada "+tr.rodada+" · n = "+n+(n%2?" (ímpar)":" (par)");
+  var m=document.getElementById("treinoMsg"); m.className="retorno"; m.textContent=""; document.getElementById("treinoResp").value="";
+}
+document.getElementById("treinoOrd").addEventListener("click", function(){ tr.ord=true; fila(tF,tr.dados,{ordenar:true}); });
+document.getElementById("treinoNovo").addEventListener("click", function(){ tr.rodada++; novoConj(); });
+document.getElementById("treinoConf").addEventListener("click", function(){
+  var r=parseFloat(document.getElementById("treinoResp").value.replace(",",".")), md=mediana(tr.dados), n=tr.dados.length, o=tr.dados.slice().sort(function(a,b){return a-b;}), m=document.getElementById("treinoMsg");
+  if(!isFinite(r)){ m.className="retorno nao"; m.textContent="Digite um número."; return; }
+  fila(tF,tr.dados,{ordenar:true});
+  var expl = n%2 ? "Em ordem: "+o.join(", ")+". Com n = "+n+", a posição central é ("+n+" + 1) / 2 = "+((n+1)/2)+": Md = "+curto(md)+"." : "Em ordem: "+o.join(", ")+". Com n = "+n+", os centrais estão nas posições "+(n/2)+" e "+(n/2+1)+" ("+o[n/2-1]+" e "+o[n/2]+"): Md = ("+o[n/2-1]+" + "+o[n/2]+") / 2 = "+curto(md)+".";
+  if(Math.abs(r-md)<1e-9){ tr.ac++; m.className="retorno ok"; m.textContent="Correto! "+expl+(tr.ac<3?" Clique em “Novo conjunto” para a próxima rodada.":""); document.getElementById("treinoAc").textContent="Acertos: "+Math.min(tr.ac,3)+" de 3"; if(tr.ac>=3) liberar("treino"); }
+  else { m.className="retorno nao"; m.textContent="Ainda não. "+expl; }
+});
+novoConj();
+
+/* resistência */
+var BASE=[5,7,9,11], eOn=document.getElementById("extOn"), eV=document.getElementById("extV");
+function extremo(){
+  eV.disabled=!eOn.checked; var v=+eV.value, d=eOn.checked?BASE.concat([v]):BASE.slice();
+  document.getElementById("extVal").textContent=v;
+  document.getElementById("extMd").textContent=curto(mediana(d)); document.getElementById("extMe").textContent=curto(media(d));
+  document.getElementById("extGrafico").innerHTML=reta(d,{min:0,max:120,ticks:[[0,"0"],[20,"20"],[40,"40"],[60,"60"],[80,"80"],[100,"100"],[120,"120"]]});
+  document.getElementById("extMsg").innerHTML = !eOn.checked ? "Com 5, 7, 9 e 11, mediana = (7 + 9) / 2 = 8 e média = 32 / 4 = 8." : "A mediana passou de 8 para <b>"+curto(mediana(d))+"</b> e não muda mais, por maior que seja o quinto valor. A média passou de 8 para <b>"+curto(media(d))+"</b>"+(v===100?", exatamente como no Exercício 5 do livro (132 / 5 = 26,4).":".");
+  if(eOn.checked&&v>=100) liberar("ext");
+}
+eOn.addEventListener("change", extremo); eV.addEventListener("input", extremo); extremo();
+
+/* acumulada */
+(function(){
+  var cl=[["[7; 13)",5],["[13; 19)",10],["[19; 25)",15],["[25; 31)",18],["[31; 37)",20]], W=560,H=280,m={l:44,r:16,t:24,b:52}, iw=W-m.l-m.r, ih=H-m.t-m.b;
+  function Y(v){return m.t+ih-ih*v/20;}
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Frequência acumulada com a linha de n/2">'];
+  [0,5,10,15,20].forEach(function(k){ s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(k)+'" y2="'+Y(k)+'" stroke="#E4E7EB"/><text x="'+(m.l-8)+'" y="'+(Y(k)+4)+'" font-size="12" text-anchor="end" fill="#7B8794">'+k+'</text>'); });
+  var bw=iw/cl.length; cl.forEach(function(c,i){ var x=m.l+i*bw+bw*.15, w=bw*.7, alvo=i===1; s.push('<rect x="'+x+'" y="'+Y(c[1])+'" width="'+w+'" height="'+(Y(0)-Y(c[1]))+'" fill="'+(alvo?LAR:CLARO)+'" rx="2"/><text x="'+(x+w/2)+'" y="'+(Y(c[1])-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="'+TINTA+'">F = '+c[1]+'</text><text x="'+(x+w/2)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+c[0]+'</text>'); });
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(10)+'" y2="'+Y(10)+'" stroke="'+TINTA+'" stroke-width="2.5" stroke-dasharray="6 4"/><text x="'+(W-m.r)+'" y="'+(Y(10)-8)+'" font-size="12" font-weight="700" text-anchor="end" fill="'+TINTA+'" stroke="#fff" stroke-width="4" paint-order="stroke">n / 2 = 10</text>');
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="#9AA5B1"/><text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">Classe (minutos) · em destaque, a classe mediana</text><text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">Frequência acumulada (F)</text></svg>');
+  document.getElementById("acumGrafico").innerHTML=s.join("");
+})();
+
+/* arrastar e soltar */
+function montarDD(pref, itens, msgErro, aoFim){
+  var banco=document.getElementById(pref+"Banco"), zonas=document.querySelectorAll("#"+pref+"Zonas .dd-zona"), msg=document.getElementById(pref+"Msg"), rest=itens.length, sel=null;
+  itens.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; banco.appendChild(d); ligar(d); });
+  function soltar(item,zona){ if(!zona) return;
+    if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent="Correto."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Tudo no lugar certo."; aoFim(); } }
+    else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent=msgErro; } }
+  function zonaEm(x,y){ var el=document.elementFromPoint(x,y); el=el?el.closest(".dd-zona"):null; return el&&el.parentNode.id===pref+"Zonas"?el:null; }
+  function ligar(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+    el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+      if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+      f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+    el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+      if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+      else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+  }
+  zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+}
+montarDD("dd1",[["Fácil de interpretar","v"],["Não é afetada por valores extremos","v"],["Pode ser calculada para variáveis ordinais","v"],["Não usa o valor exato de cada observação","l"],["Conjuntos muito diferentes podem ter a mesma mediana","l"]],"Ainda não. Pense se a característica ajuda ou atrapalha a descrição dos dados.",function(){ duplo.dd=true; if(duplo.cmp) liberar("cmpdd"); });
+
+/* laboratório */
+function lerNumeros(txt){ return txt.trim().split(/[\s;]+/).filter(Boolean).map(function(x){return Number(x.replace(/\./g,"").replace(",","."));}); }
+var lF=document.getElementById("labFila");
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var d=lerNumeros(document.getElementById("labDados").value);
+  if(d.length<2){ erro.textContent="Digite pelo menos dois valores."; return; }
+  if(d.some(function(x){return !isFinite(x);})){ erro.textContent="Há algum valor que não é número. Separe com espaço ou ponto e vírgula, e use vírgula só para decimais."; return; }
+  if(d.length>200){ erro.textContent="Use no máximo 200 valores."; return; }
+  var n=d.length, o=d.slice().sort(function(a,b){return a-b;}), md=mediana(d), me=media(d), grande=Math.max.apply(null,d)>=10000, fm=grande?reais:curto;
+  resetFila(lF); if(n<=14){ lF.style.display=""; fila(lF,d,{ordenar:true,fmt:grande?function(v){return (v/1000).toLocaleString("pt-BR")+" mil";}:null}); } else { lF.style.display="none"; }
+  var pos = n%2 ? "n = "+n+" (ímpar): posição central ("+n+" + 1) / 2 = "+((n+1)/2)+"º valor." : "n = "+n+" (par): média do "+(n/2)+"º e do "+(n/2+1)+"º valores ("+fm(o[n/2-1])+" e "+fm(o[n/2])+").";
+  var dif=me-md, rel=Math.abs(dif)/(Math.max(Math.abs(md),1e-9)), leitura;
+  if(rel<0.05) leitura="Média e mediana estão muito próximas: o conjunto parece aproximadamente simétrico.";
+  else if(dif>0) leitura="A média ficou acima da mediana: há valores altos puxando a média para a direita. A mediana descreve melhor o valor típico.";
+  else leitura="A média ficou abaixo da mediana: há valores baixos puxando a média para a esquerda. A mediana descreve melhor o valor típico.";
+  document.getElementById("labRes").innerHTML='<p class="fonte">'+pos+'</p><div class="caixas"><div class="caixa destaque-cx"><span>Mediana</span><b>'+fm(md)+'</b></div><div class="caixa"><span>Média</span><b>'+fm(me)+'</b></div></div><p>'+leitura+'</p>';
+  var mn=o[0], mx=o[n-1], pad=(mx-mn)*0.05||1;
+  document.getElementById("labGrafico").innerHTML=reta(d,{min:mn-pad,max:mx+pad,fmt:fm,ticks:[[mn,fm(mn)],[mx,fm(mx)]]});
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.getElementById("labEx1").addEventListener("click", function(){ document.getElementById("labDados").value="28 31 25 33 29 27 30"; lab(); });
+document.getElementById("labEx2").addEventListener("click", function(){ document.getElementById("labDados").value="2000 2200 2400 2500 2600 2700 2800 2900 3000 50000"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"As temperaturas máximas de sete dias foram 28, 31, 25, 33, 29, 27 e 30 °C. Qual é a mediana?", o:["33 °C","29 °C","29,6 °C","28 °C"], c:1, x:"Ordenando: 25, 27, 28, 29, 30, 31, 33. Com n = 7, a posição central é (7 + 1) / 2 = 4: Md = 29 °C."},
+ {e:"Seis atendimentos duraram 4, 9, 6, 12, 7 e 10 minutos. Qual é a mediana?", o:["6,5 min","8 min","9 min","7 min"], c:1, x:"Ordenando: 4, 6, 7, 9, 10, 12. Com n = 6 (par), os centrais são o 3º e o 4º (7 e 9): Md = (7 + 9) / 2 = 8 minutos."},
+ {e:"Aos valores 5, 7, 9 e 11 acrescenta-se o valor 100. O que acontece?", o:["Mediana vai de 8 para 9; média, de 8 para 26,4","As duas vão para 26,4","Mediana vai para 100; média para 26,4","Nenhuma muda"], c:0, x:"A mediana sobe só de 8 para 9, pois o extremo não altera a posição central. A média salta de 8 para 132 / 5 = 26,4, pois depende do valor de cada observação."},
+ {e:"A mediana corresponde a qual separatriz?", o:["Ao primeiro quartil","Ao segundo quartil","Ao terceiro quartil","Ao décimo decil"], c:1, x:"A mediana separa os 50% menores dos 50% maiores: é o segundo quartil (Q2), tema da Lição 7."},
+ {e:"Para o grau de escolaridade (fundamental, médio, superior), qual medida de centro faz sentido além da moda?", o:["A média dos códigos","A mediana, porque há ordem entre as categorias","Nenhuma outra","A média ponderada"], c:1, x:"A mediana pode ser calculada para variáveis ordinais, desde que haja ordem entre as categorias. A média dos códigos não tem interpretação segura (Lição 1)."}
+];
+var qi=0, ac=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+ac+'/'+QUIZ.length+'</div><p>'+(ac>=4?"Excelente! Você está pronto para a Lição 7.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;ac=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+ac+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) ac++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+desenharAmigos(); desenharVendas();
+var rT=null; window.addEventListener("resize", function(){ clearTimeout(rT); rT=setTimeout(function(){ resetFila(fA); resetFila(fV); desenharAmigos(); desenharVendas(); resetFila(tF); fila(tF,tr.dados,{ordenar:tr.ord}); },60); });
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>

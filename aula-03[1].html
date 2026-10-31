@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lição 3 – Representando dados com gráficos | Estatística Descritiva</title>
+<script>
+/*!
+ * curso.js — camada compartilhada do curso "Estatística Descritiva" (DeCastro)
+ * Usado por: painel.html (e index.html) e todas as aula-NN.html
+ *
+ * COMO O ACESSO FUNCIONA
+ *  O curso é um complemento do livro "Estatística Descritiva: aprendendo com a vida real".
+ *  Quem compra o livro recebe um código de acesso; o mesmo código, digitado no painel,
+ *  libera as 13 aulas. Não há e-mail, senha nem servidor: o código fica aqui em
+ *  CONFIG.CODIGO_ACESSO e o navegador do aluno lembra que ele já entrou.
+ *
+ *  >>> O código do livro fica SÓ no painel.html (procure CODIGO_ACESSO). <<<
+ *  As aulas apenas verificam se o aluno já entrou pelo painel.
+ *  Quem já tinha entrado com o código antigo precisará digitar o novo.
+ *
+ *  Atenção: como o site é estático, o código pode ser lido por quem inspecionar este
+ *  arquivo. Ele organiza o acesso dos compradores, mas não é uma proteção à prova de
+ *  quem queira burlar.
+ *
+ *  As chaves do navegador começam com "decastro_estat_" para não se misturarem com as
+ *  do curso Gerenciamento Empresarial, caso os dois fiquem no mesmo site.
+ */
+(function (global) {
+  "use strict";
+
+  const CONFIG = {
+    CODIGO_ACESSO: null, // nas aulas o código não é necessário: ele fica no painel.html
+    WHATSAPP_NUMERO: "5598988804678", // (98) 98880-4678
+    SUPORTE_EMAIL: "lojasdecastro@gmail.com",
+    TITULO: "Estatística Descritiva",
+    SUBTITULO: "Aprendendo com a vida real",
+  };
+
+  // ---------------------------------------------------------------------
+  // LISTA DAS AULAS E DOS BLOCOS
+  // ---------------------------------------------------------------------
+  const BLOCOS = {
+    0: "Comece aqui",
+    1: "Como organizar e mostrar os dados?",
+    2: "Onde fica o centro dos dados?",
+    3: "Qual é a posição de um valor?",
+    4: "Quão espalhados estão os dados?",
+    5: "Qual é o formato do conjunto?",
+  };
+  const LESSONS = [
+    { n: 0, bloco: 0, titulo: "Aula introdutória: conheça o curso", temas: "Como o curso funciona e o mapa dos 12 capítulos" },
+    { n: 1, bloco: 1, titulo: "Os dados estão em todo lugar", temas: "População, amostra, variáveis e níveis de mensuração" },
+    { n: 2, bloco: 1, titulo: "Distribuição de frequência para dados contínuos", temas: "Classes, amplitude, ponto médio e histograma" },
+    { n: 3, bloco: 1, titulo: "Representando dados com gráficos", temas: "Barras, histograma, polígono, setores e gráficos enganosos" },
+    { n: 4, bloco: 2, titulo: "Moda: o valor que mais se repete", temas: "Moda, classificação e fórmula de Czuber" },
+    { n: 5, bloco: 2, titulo: "Média aritmética: o ponto de equilíbrio", temas: "Média simples, ponderada e de dados agrupados" },
+    { n: 6, bloco: 2, titulo: "Mediana: o valor central", temas: "Mediana em dados ordenados e agrupados" },
+    { n: 7, bloco: 3, titulo: "Quartis, decis e percentis", temas: "Medidas separatrizes e posição relativa" },
+    { n: 8, bloco: 4, titulo: "Amplitude e amplitude interquartil", temas: "As primeiras medidas de dispersão" },
+    { n: 9, bloco: 4, titulo: "Variância", temas: "Desvios, variância populacional e amostral" },
+    { n: 10, bloco: 4, titulo: "Desvio padrão", temas: "Cálculo, interpretação e regra empírica" },
+    { n: 11, bloco: 4, titulo: "Coeficiente de variação", temas: "Dispersão relativa e condições de uso" },
+    { n: 12, bloco: 5, titulo: "Forma da distribuição e boxplot", temas: "Assimetria, curtose, boxplot e valores atípicos" },
+  ];
+  function aulaFile(n) { return "aula-" + String(n).padStart(2, "0") + ".html"; }
+
+  // ---------------------------------------------------------------------
+  // ARMAZENAMENTO: usa o localStorage; se o navegador bloquear (janelas protegidas,
+  // modo anônimo restrito, visualização incorporada), guarda em window.name, que
+  // continua valendo enquanto o aluno navega entre as páginas na mesma aba.
+  // ---------------------------------------------------------------------
+  const Store = (function () {
+    let ls = null;
+    try { const t = "__decastro_t"; localStorage.setItem(t, "1"); localStorage.removeItem(t); ls = localStorage; } catch (e) { ls = null; }
+    const PREF = "DECASTRO_ESTAT:";
+    function lerNome() { try { return window.name && window.name.indexOf(PREF) === 0 ? JSON.parse(window.name.slice(PREF.length)) : {}; } catch (e) { return {}; } }
+    function gravarNome(o) { try { window.name = PREF + JSON.stringify(o); } catch (e) {} }
+    return {
+      persistente: !!ls,
+      get: function (k) { if (ls) { try { return ls.getItem(k); } catch (e) {} } const o = lerNome(); return k in o ? o[k] : null; },
+      set: function (k, v) { if (ls) { try { ls.setItem(k, String(v)); return true; } catch (e) {} } const o = lerNome(); o[k] = String(v); gravarNome(o); return true; },
+      del: function (k) { if (ls) { try { ls.removeItem(k); } catch (e) {} } const o = lerNome(); delete o[k]; gravarNome(o); },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // ACESSO POR CÓDIGO
+  // ---------------------------------------------------------------------
+  const LS_ACESSO = "decastro_estat_acesso_v1";
+  const LS_PROGRESSO = "decastro_estat_progresso_v1"; // { "0": 100, "1": 45, ... } — só neste aparelho
+  const LS_ULTIMA = "decastro_estat_ultima_v1";
+
+  function normalizar(c) { return String(c || "").replace(/\s+/g, "").toUpperCase(); }
+  function temAcesso() {
+    if (CONFIG.CODIGO_ACESSO === null) return !!Store.get(LS_ACESSO); // nas aulas: basta ter entrado pelo painel
+    return normalizar(Store.get(LS_ACESSO)) === normalizar(CONFIG.CODIGO_ACESSO);
+  }
+  // Devolve "ok", "invalido" ou "armazenamento" (navegador não deixou salvar).
+  function entrar(codigo) {
+    if (normalizar(codigo) !== normalizar(CONFIG.CODIGO_ACESSO)) return "invalido";
+    Store.set(LS_ACESSO, normalizar(codigo));
+    return temAcesso() ? "ok" : "armazenamento";
+  }
+  function logout() { Store.del(LS_ACESSO); }
+
+  // ---------------------------------------------------------------------
+  // PROGRESSO (só neste aparelho)
+  // ---------------------------------------------------------------------
+  function getProgresso() {
+    try { const p = JSON.parse(Store.get(LS_PROGRESSO) || "{}"); return p && typeof p === "object" ? p : {}; } catch (e) { return {}; }
+  }
+  function registrar(n, pct) {
+    const p = getProgresso(), v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((p[n] || 0) < v) { p[n] = v; Store.set(LS_PROGRESSO, JSON.stringify(p)); }
+  }
+  function ultimaAula() { const v = Store.get(LS_ULTIMA); return v === null ? null : Number(v); }
+  function proximaAula() {
+    const p = getProgresso(), u = ultimaAula();
+    if (u !== null && (p[u] || 0) < 100) return LESSONS[u];
+    for (let i = 0; i < LESSONS.length; i++) { const v = p[LESSONS[i].n] || 0; if (v > 0 && v < 100) return LESSONS[i]; }
+    for (let i = 0; i < LESSONS.length; i++) if ((p[LESSONS[i].n] || 0) < 100) return LESSONS[i];
+    return null;
+  }
+  function progressoGeral() {
+    const p = getProgresso(); let soma = 0;
+    LESSONS.forEach(function (l) { soma += p[l.n] || 0; });
+    return Math.round(soma / LESSONS.length);
+  }
+  function concluidas() { const p = getProgresso(); return LESSONS.filter(function (l) { return (p[l.n] || 0) >= 100; }).length; }
+
+  // ---------------------------------------------------------------------
+  // INTEGRAÇÃO COM AS PÁGINAS DE AULA
+  // ---------------------------------------------------------------------
+  function numeroDaAula() { const m = location.pathname.match(/aula-(\d+)\.html$/i); return m ? Number(m[1]) : null; }
+
+  // Trava: sem o código, o aluno vai ao painel e volta para a aula depois de entrar.
+  function guardAula() {
+    const n = numeroDaAula();
+    if (n === null || temAcesso()) return;
+    location.replace("painel.html?retorno=" + encodeURIComponent(aulaFile(n)));
+  }
+
+  const CSS_AULA = [
+    ".licoes a{display:flex;gap:12px;align-items:flex-start;color:inherit;text-decoration:none;width:100%}",
+    ".licoes li{cursor:pointer}",
+    ".licoes li:not(.ativa):hover{background:#FAFAF8}",
+    ".licoes .mini{margin-left:auto;font-size:11px;font-weight:700;color:var(--laranja);white-space:nowrap}",
+    ".voltar-painel{display:flex;align-items:center;gap:8px;padding:12px 22px;font-size:13px;font-weight:700;color:var(--tinta);text-decoration:none;border-bottom:1px solid var(--linha);background:#fff}",
+    ".voltar-painel:hover{color:var(--laranja)}",
+    ".nav-aulas{max-width:760px;margin:0 auto;padding:10px 32px 56px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}",
+    ".nav-aulas a{flex:1;min-width:200px;display:block;padding:16px 18px;border-radius:6px;text-decoration:none;border:2px solid var(--linha);color:var(--tinta);background:#fff}",
+    ".nav-aulas a small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza);font-weight:700;margin-bottom:4px}",
+    ".nav-aulas a.prox{border-color:var(--laranja);text-align:right}",
+    ".nav-aulas a.prox small{color:var(--laranja)}",
+    ".nav-aulas a:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}",
+    ".tm-painel{color:var(--tinta);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap}",
+  ].join("\n");
+
+  function montarAula() {
+    const n = numeroDaAula(); if (n === null) return;
+    Store.set(LS_ULTIMA, String(n));
+    const st = document.createElement("style"); st.textContent = CSS_AULA; document.head.appendChild(st);
+
+    // menu lateral com links para todas as aulas
+    const ol = document.querySelector(".lateral .licoes");
+    if (ol) {
+      const p = getProgresso();
+      ol.innerHTML = LESSONS.map(function (l) {
+        const v = p[l.n] || 0, feita = v >= 100, atual = l.n === n;
+        return '<li class="' + (atual ? "ativa" : feita ? "feita" : "") + '"><a href="' + aulaFile(l.n) + '"><span class="num">' + (feita && !atual ? "✓" : l.n) + "</span><span>" + l.titulo + "</span>" + (!feita && !atual && v > 0 ? '<span class="mini">' + v + "%</span>" : "") + "</a></li>";
+      }).join("");
+      const topo = document.querySelector(".lateral-topo");
+      if (topo && !document.querySelector(".voltar-painel")) topo.insertAdjacentHTML("afterend", '<a class="voltar-painel" href="painel.html">← Voltar ao painel do curso</a>');
+    }
+    // link do painel na barra do celular
+    const tm = document.querySelector(".topo-movel .tm-pct");
+    if (tm && !document.querySelector(".tm-painel")) tm.insertAdjacentHTML("beforebegin", '<a class="tm-painel" href="painel.html">Painel</a>');
+
+    // navegação anterior / próxima no fim da aula
+    const main = document.querySelector("main");
+    if (main && !document.querySelector(".nav-aulas")) {
+      const ant = LESSONS[n - 1], prox = LESSONS[n + 1];
+      let h = '<nav class="nav-aulas" aria-label="Navegação entre aulas">';
+      h += ant ? '<a href="' + aulaFile(ant.n) + '"><small>← Aula anterior</small>' + (ant.n === 0 ? "Aula introdutória" : "Lição " + ant.n + " · " + ant.titulo) + "</a>" : '<a href="painel.html"><small>←</small>Voltar ao painel</a>';
+      h += prox ? '<a class="prox" href="' + aulaFile(prox.n) + '"><small>Próxima aula →</small>Lição ' + prox.n + " · " + prox.titulo + "</a>" : '<a class="prox" href="painel.html"><small>Curso concluído →</small>Voltar ao painel</a>';
+      main.insertAdjacentHTML("beforeend", h + "</nav>");
+    }
+
+    // registra o progresso que a aula mostra em #pct
+    const pct = document.getElementById("pct");
+    if (pct) {
+      const ler = function () { const v = parseFloat(pct.textContent); if (isFinite(v)) registrar(n, v); };
+      new MutationObserver(ler).observe(pct, { childList: true, characterData: true, subtree: true });
+      ler();
+    }
+  }
+
+  global.Curso = {
+    CONFIG: CONFIG, LESSONS: LESSONS, BLOCOS: BLOCOS, aulaFile: aulaFile,
+    persistente: Store.persistente, temAcesso: temAcesso, entrar: entrar, logout: logout,
+    getProgresso: getProgresso, registrar: registrar, proximaAula: proximaAula,
+    progressoGeral: progressoGeral, concluidas: concluidas, ultimaAula: ultimaAula,
+    whatsappLink: function (msg) { return "https://wa.me/" + CONFIG.WHATSAPP_NUMERO + "?text=" + encodeURIComponent(msg || "Olá! Preciso de ajuda para acessar o curso Estatística Descritiva."); },
+  };
+
+  guardAula();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", montarAula); else montarAula();
+})(window);
+
+</script>
+<style>
+:root{
+  --laranja:#E4572E; --laranja-esc:#C2421D; --laranja-claro:#FDECE6;
+  --tinta:#1F2933; --texto:#3E4C59; --cinza:#9AA5B1; --linha:#E4E7EB; --fundo:#F7F7F5;
+  --verde:#2F9E6E; --verde-claro:#E3F5EC; --vermelho:#D64545; --vermelho-claro:#FBE9E9;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--texto);background:#fff;display:flex}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- Barra lateral ---------- */
+.lateral{width:300px;flex:0 0 300px;height:100vh;position:sticky;top:0;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--linha)}
+.lateral-topo{background:var(--laranja);color:#fff;padding:28px 22px 20px}
+.lateral-topo .marca{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral-topo h1{font-family:var(--serif);font-size:24px;line-height:1.2;margin:10px 0 18px}
+.progresso-txt{font-size:12px;font-weight:600;letter-spacing:.05em}
+.barra{height:5px;background:rgba(255,255,255,.35);border-radius:3px;margin-top:6px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:#fff;transition:width .5s}
+.licoes{list-style:none;margin:0;padding:10px 0;overflow-y:auto;flex:1}
+.licoes li{display:flex;gap:12px;align-items:flex-start;padding:12px 22px;font-size:14px;line-height:1.35;color:var(--cinza)}
+.licoes li.ativa{color:var(--tinta);font-weight:600;background:var(--laranja-claro);border-left:4px solid var(--laranja);padding-left:18px}
+.licoes .num{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.licoes li.ativa .num{background:var(--laranja);border-color:var(--laranja);color:#fff}
+.licoes li .cad{font-size:11px;margin-left:auto}
+.btn-menu{display:none}
+
+/* ---------- Conteúdo ---------- */
+main{flex:1;min-width:0;height:100vh;overflow-y:auto;scroll-behavior:smooth}
+.bloco{max-width:760px;margin:0 auto;padding:56px 32px}
+.bloco.largo{max-width:none;background:var(--fundo)}
+.bloco.largo>.dentro{max-width:760px;margin:0 auto}
+.secao{display:none}
+.secao.visivel{display:block;animation:surgir .6s ease}
+@keyframes surgir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.rotulo{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--laranja);font-weight:700}
+h2{font-family:var(--serif);color:var(--tinta);font-size:30px;line-height:1.25;margin:8px 0 18px;font-weight:normal}
+h3{font-family:var(--serif);color:var(--tinta);font-size:22px;font-weight:normal;margin:0 0 12px}
+p{font-family:var(--serif);font-size:18px;line-height:1.7;margin:0 0 16px}
+.fonte{font-size:13px;color:var(--cinza);font-family:var(--sans)}
+.citacao{border-left:4px solid var(--laranja);padding:18px 24px;background:#fff;font-family:var(--serif);font-size:20px;line-height:1.6;color:var(--tinta);margin:28px 0;box-shadow:0 2px 14px rgba(0,0,0,.05)}
+.citacao small{display:block;font-family:var(--sans);font-size:13px;color:var(--cinza);margin-top:8px}
+
+.capa{background:linear-gradient(135deg,#1F2933 0%,#3E4C59 100%);color:#fff;padding:90px 32px 70px}
+.capa .dentro{max-width:760px;margin:0 auto}
+.capa .rotulo{color:#FFB199}
+.capa h2{color:#fff;font-size:42px}
+.autor{display:flex;align-items:center;gap:10px;font-size:14px;margin-top:22px}
+.autor b{width:34px;height:34px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-size:13px}
+
+/* objetivos */
+.objetivos{list-style:none;padding:0;margin:24px 0 0}
+.objetivos li{display:flex;gap:16px;align-items:center;padding:12px 0;font-size:17px;opacity:0;transform:translateX(-10px);transition:all .5s}
+.objetivos li.on{opacity:1;transform:none}
+.objetivos .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--laranja);color:#fff;display:grid;place-items:center;font-weight:700}
+
+/* botão continuar */
+.continuar{display:block;width:100%;max-width:760px;margin:0 auto;background:var(--laranja);color:#fff;border:0;padding:16px;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;transition:background .2s}
+.continuar:hover{background:var(--laranja-esc)}
+.continuar-wrap{padding:0 32px 56px}
+.continuar[disabled]{background:var(--linha);color:var(--cinza);cursor:not-allowed}
+.dica-trava{text-align:center;font-size:13px;color:var(--cinza);margin-top:8px}
+
+/* abas */
+.abas{display:flex;border-bottom:2px solid var(--linha);margin-top:20px;overflow-x:auto}
+.abas button{background:none;border:0;padding:14px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza);border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.abas button.on{color:var(--laranja);border-color:var(--laranja)}
+.painel{display:none;padding:24px 0}
+.painel.on{display:block;animation:surgir .4s}
+.fichas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.ficha{min-width:44px;padding:8px 12px;border-radius:6px;background:var(--fundo);border:1px solid var(--linha);text-align:center;font-weight:600;color:var(--tinta);transition:all .3s}
+.ficha.destaque{background:var(--laranja);color:#fff;border-color:var(--laranja);transform:scale(1.1)}
+.ficha.contada{opacity:.35}
+
+/* cartões que viram */
+.cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:20px;margin-top:24px}
+.cartao{perspective:1000px;height:220px;background:none;border:0;padding:0}
+.cartao .giro{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.cartao.virado .giro{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px;text-align:center;box-shadow:0 3px 16px rgba(0,0,0,.08)}
+.frente{background:#fff;border-top:4px solid var(--laranja);font-family:var(--serif);font-size:19px;color:var(--tinta)}
+.frente small{font-family:var(--sans);font-size:12px;color:var(--cinza);margin-top:14px}
+.verso{background:var(--tinta);color:#fff;transform:rotateY(180deg);font-size:15px;line-height:1.55}
+
+/* acordeão */
+.acordeao{border-top:1px solid var(--linha);margin-top:20px}
+.acordeao details{border-bottom:1px solid var(--linha)}
+.acordeao summary{list-style:none;padding:18px 4px;font-weight:600;color:var(--tinta);font-size:17px;display:flex;justify-content:space-between;cursor:pointer}
+.acordeao summary::-webkit-details-marker{display:none}
+.acordeao summary::after{content:"+";font-size:22px;color:var(--laranja);line-height:1}
+.acordeao details[open] summary::after{content:"–"}
+.acordeao .corpo{padding:0 4px 18px;border-left:3px solid var(--laranja);padding-left:16px;margin-bottom:16px}
+.acordeao .corpo p{font-size:17px}
+
+/* questão */
+.questao{background:#fff;border-radius:6px;padding:30px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:24px}
+.questao .enunciado{font-size:17px;color:var(--tinta);font-weight:600;line-height:1.5;margin-bottom:18px}
+.opcao{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;padding:13px 14px;border-radius:5px;font-size:16px;color:var(--texto);margin-bottom:4px}
+.opcao:hover{background:var(--fundo)}
+.opcao .radio{flex:0 0 20px;height:20px;border-radius:50%;border:2px solid var(--cinza)}
+.opcao.sel{background:var(--fundo)}
+.opcao.sel .radio{border:6px solid var(--laranja)}
+.opcao.certa{background:var(--verde-claro);border-color:var(--verde)}
+.opcao.errada{background:var(--vermelho-claro);border-color:var(--vermelho)}
+.btn-enviar{display:block;margin:20px auto 0;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 44px;font-size:13px;font-weight:700;letter-spacing:.12em}
+.btn-enviar[disabled]{opacity:.4;cursor:not-allowed}
+.retorno{display:none;margin-top:18px;padding:16px 18px;border-radius:5px;font-size:15px;line-height:1.55}
+.retorno.ok{display:block;background:var(--verde-claro);color:#1d6b49}
+.retorno.nao{display:block;background:var(--vermelho-claro);color:#963030}
+
+/* arrastar e soltar */
+.dd-banco{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;min-height:56px;margin:22px 0}
+.dd-item{background:#fff;border:1px solid var(--linha);border-top:3px solid var(--laranja);padding:12px 16px;border-radius:4px;font-size:15px;font-weight:600;color:var(--tinta);box-shadow:0 2px 8px rgba(0,0,0,.06);touch-action:none;user-select:none;cursor:grab}
+.dd-item.selecionado{outline:3px solid var(--laranja)}
+.dd-item.fixo{cursor:default;border-top-color:var(--verde);font-size:13px;padding:8px 10px}
+.dd-item.fantasma{position:fixed;pointer-events:none;z-index:999;transform:rotate(-3deg);box-shadow:0 10px 24px rgba(0,0,0,.18)}
+.dd-item.tremer{animation:tremer .4s}
+@keyframes tremer{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.dd-zonas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.dd-zona{background:#ECEEF0;border:2px dashed transparent;border-radius:5px;min-height:150px;padding:12px;display:flex;flex-direction:column;gap:8px;transition:all .2s}
+.dd-zona.alvo{border-color:var(--laranja);background:var(--laranja-claro)}
+.dd-zona h4{margin:0 0 4px;text-align:center;font-size:14px;color:var(--tinta)}
+.dd-zona h4 small{display:block;font-weight:normal;color:var(--cinza);font-size:11px;margin-top:2px}
+.dd-msg{text-align:center;min-height:24px;font-size:15px;font-weight:600;margin-top:12px}
+
+/* tabela e gráfico */
+table.freq{width:100%;border-collapse:collapse;margin:16px 0;font-size:15px;background:#fff}
+table.freq th{background:var(--tinta);color:#fff;font-weight:600;padding:10px;font-size:13px}
+table.freq td{padding:10px;text-align:center;border-bottom:1px solid var(--linha)}
+table.freq tr.total td{font-weight:700;background:var(--fundo)}
+table.freq tr.pisca td{background:var(--laranja-claro);transition:background .3s}
+.grafico{width:100%;max-width:520px;display:block;margin:14px auto}
+.controles{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.btn-sec{background:#fff;border:2px solid var(--laranja);color:var(--laranja);padding:10px 18px;border-radius:30px;font-weight:700;font-size:13px}
+.btn-sec:hover{background:var(--laranja-claro)}
+.btn-sec[disabled]{opacity:.4;cursor:not-allowed}
+textarea{width:100%;font-family:inherit;font-size:16px;padding:12px;border:1px solid var(--linha);border-radius:5px;resize:vertical}
+.erro-txt{color:var(--vermelho);font-size:14px;min-height:20px}
+
+/* passos */
+.passos{background:#fff;border-radius:6px;box-shadow:0 3px 18px rgba(0,0,0,.07);padding:36px 70px 26px;position:relative;margin-top:24px;text-align:left}
+.passos .etq{display:inline-block;background:var(--laranja);color:#fff;font-weight:700;font-size:13px;padding:6px 14px;border-radius:4px;margin-bottom:12px}
+.passo{display:none}.passo.on{display:block;animation:surgir .4s}
+.passo h3{font-family:var(--sans);font-weight:700;font-size:20px}
+.passo p{font-size:16px}
+.seta{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:var(--tinta);color:#fff;border:0;font-size:20px}
+.seta.esq{left:12px}.seta.dir{right:12px}
+.seta[disabled]{opacity:.2;cursor:default}
+.pontos{display:flex;justify-content:center;gap:8px;margin-top:18px}
+.pontos span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;color:var(--cinza);border:1px solid transparent}
+.pontos span.on{border-color:var(--tinta);color:var(--tinta);font-weight:700}
+
+/* quiz */
+.quiz-topo{display:flex;justify-content:space-between;font-size:13px;color:var(--cinza);margin-bottom:6px}
+.placar{text-align:center;padding:30px 10px}
+.placar .grande{font-family:var(--serif);font-size:56px;color:var(--laranja)}
+
+.atividade{background:var(--tinta);color:#fff;border-radius:6px;padding:28px 30px}
+.atividade p{color:#E4E7EB;font-size:17px}
+.atividade .rotulo{color:#FFB199}
+
+footer.fim{text-align:center;padding:40px 20px 60px;color:var(--cinza);font-size:13px}
+
+@media (max-width:860px){
+  body{display:block}
+  .lateral{position:fixed;left:0;top:0;z-index:50;transform:translateX(-100%);transition:transform .3s}
+  .lateral.aberta{transform:none;box-shadow:4px 0 20px rgba(0,0,0,.2)}
+  .btn-menu{display:block;position:fixed;top:12px;left:12px;z-index:60;background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:10px 14px;font-size:14px;font-weight:700}
+  main{height:auto;overflow:visible}
+  .bloco{padding:44px 20px}
+  .capa{padding:80px 20px 50px}.capa h2{font-size:32px}
+  h2{font-size:25px}
+  .passos{padding:30px 22px 22px}
+  .seta{position:static;transform:none;display:inline-block;margin:10px 6px 0}
+  .continuar-wrap{padding:0 20px 44px}
+}
+
+.licoes li.feita{color:var(--verde)}
+.licoes li.feita .num{background:var(--verde);border-color:var(--verde);color:#fff}
+.formula{background:var(--fundo);border-left:4px solid var(--laranja);padding:14px 18px;font-size:17px;color:var(--tinta);margin:6px 0 16px;border-radius:0 4px 4px 0}
+.painel-calc{background:#fff;border-radius:6px;padding:26px 28px;box-shadow:0 3px 18px rgba(0,0,0,.07);margin-top:16px}
+.painel-calc label{font-size:16px;color:var(--tinta)}
+input[type=range]{width:100%;accent-color:var(--laranja);margin:14px 0 18px;height:28px}
+.caixas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0}
+.caixa{background:var(--fundo);border-radius:5px;padding:14px;text-align:center}
+.caixa span{display:block;font-size:12px;color:var(--cinza);margin-bottom:6px}
+.caixa b{font-size:22px;color:var(--tinta);font-family:var(--serif);font-weight:normal}
+.caixa.destaque-cx{background:var(--laranja-claro)}
+.caixa.destaque-cx b{color:var(--laranja-esc)}
+.comparar{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:10px 0 6px}
+.comparar h3{font-family:var(--sans);font-size:16px;font-weight:700;text-align:center}
+.dd-zonas.cinco{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.comparar{grid-template-columns:1fr}.dd-zonas.cinco{grid-template-columns:repeat(2,1fr)}}
+.intro-audio{background:var(--tinta);color:#fff;border-radius:8px;padding:22px 24px;margin:0 0 28px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px}
+.intro-audio .ia-txt{flex:1;min-width:200px}
+.intro-audio .ia-txt b{display:block;font-size:17px}
+.intro-audio .ia-txt span{font-size:13px;color:#9AA5B1}
+.intro-audio details{flex-basis:100%;border-top:1px solid #3E4C59;padding-top:10px}
+.intro-audio summary{cursor:pointer;font-size:13px;color:#FFB199;font-weight:600}
+.intro-audio details p{color:#E4E7EB;font-size:16px;margin:12px 0 0}
+.btn-audio{display:inline-flex;align-items:center;gap:8px;background:var(--laranja);color:#fff;border:0;border-radius:30px;padding:12px 22px;font-size:14px;font-weight:700}
+.btn-audio:hover{background:var(--laranja-esc)}
+.btn-audio.tocando{background:#fff;color:var(--laranja-esc)}
+.narra{transition:background .3s;border-radius:4px}
+.intro-audio .narra.lendo{background:#3E4C59;box-shadow:0 0 0 6px #3E4C59;color:#fff}
+.player{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:80;background:var(--tinta);color:#fff;border-radius:40px;padding:8px 18px 8px 8px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);max-width:94vw}
+.player[hidden]{display:none}
+.pl-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--laranja);color:#fff;font-size:14px;flex:0 0 40px}
+.pl-btn.parar{background:#3E4C59}
+.pl-info{display:flex;flex-direction:column;min-width:0;font-size:13px}
+.pl-info b,.pl-info span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.pl-info span{color:#9AA5B1;font-size:11px}
+.pl-vel{font-size:11px;color:#9AA5B1;display:flex;flex-direction:column}
+.pl-vel select{background:#323F4B;color:#fff;border:0;border-radius:4px;padding:3px}
+@media (max-width:860px){.pl-info b,.pl-info span{max-width:140px}}
+
+.topo-movel{display:none}
+@media (max-width:860px){
+  .btn-menu{display:none!important}
+  .topo-movel{display:flex;align-items:center;gap:12px;position:fixed;top:0;left:0;right:0;height:54px;z-index:60;background:#fff;border-bottom:1px solid var(--linha);padding:0 14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .topo-movel button{background:var(--laranja);color:#fff;border:0;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700;flex:0 0 auto}
+  .topo-movel .tm-tit{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topo-movel .tm-pct{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--laranja)}
+  .topo-movel .tm-barra{position:absolute;left:0;bottom:-1px;height:3px;background:var(--laranja);width:0;transition:width .5s}
+  body{padding-top:54px}
+  .lateral{top:54px;height:calc(100vh - 54px);z-index:59}
+  .veu{position:fixed;inset:54px 0 0 0;background:rgba(31,41,51,.4);z-index:58;display:none}
+  .veu.on{display:block}
+  .capa{padding-top:48px!important}
+  .secao,#detalheWrap,.narra{scroll-margin-top:62px}
+}
+
+.cartoes.quatro{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.praticas{display:flex;flex-direction:column;gap:10px;background:var(--fundo);border-radius:6px;padding:16px 20px;margin:10px 0 6px}
+.praticas label,.chk{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--tinta);cursor:pointer}
+.chk{font-size:14px}
+.praticas input,.chk input{width:20px;height:20px;accent-color:var(--laranja)}
+.setores-wrap{display:grid;grid-template-columns:260px 1fr;gap:28px;align-items:center;margin:16px 0}
+.grafico.pizza{max-width:260px}
+.fatia{transition:opacity .25s;cursor:pointer}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-size:13px;margin-top:8px}
+.legenda i,.bolinha{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#setTabela tr[data-i]{cursor:pointer}
+.eixo-grid{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center}
+.caixas.uma-col{grid-template-columns:1fr}
+.caixa b{display:block}
+@media (max-width:860px){.setores-wrap,.eixo-grid{grid-template-columns:1fr}.grafico.pizza{margin:0 auto}}
+</style>
+</head>
+<body data-aula="aula03">
+<div class="topo-movel"><button id="btnMenu" aria-label="Abrir menu do curso">☰ Lições</button><span class="tm-tit">Lição 3 · Representando dados com gráficos</span><span class="tm-pct" id="tmPct">0%</span><i class="tm-barra" id="tmBarra"></i></div>
+<div class="veu" id="veu"></div>
+
+<aside class="lateral" id="lateral">
+  <div class="lateral-topo">
+    <div class="marca">DeCastro · O Canal do Conhecimento</div>
+    <h1>Estatística Descritiva: Aprendendo com a vida real</h1>
+    <div class="progresso-txt"><span id="pct">0</span>% CONCLUÍDO</div>
+    <div class="barra"><i id="barra"></i></div>
+  </div>
+  <ol class="licoes">
+    <li class="feita"><span class="num">✓</span>Os dados estão em todo lugar</li>
+    <li class="feita"><span class="num">✓</span>Distribuição de frequência para dados contínuos</li>
+    <li class="ativa"><span class="num">3</span>Representando dados com gráficos</li>
+    <li><span class="num">4</span>Moda: o valor que mais se repete<span class="cad">🔒</span></li>
+    <li><span class="num">5</span>Média aritmética: o ponto de equilíbrio<span class="cad">🔒</span></li>
+    <li><span class="num">6</span>Mediana: o valor central<span class="cad">🔒</span></li>
+    <li><span class="num">7</span>Quartis, decis e percentis<span class="cad">🔒</span></li>
+    <li><span class="num">8</span>Amplitude e amplitude interquartil<span class="cad">🔒</span></li>
+    <li><span class="num">9</span>Variância<span class="cad">🔒</span></li>
+    <li><span class="num">10</span>Desvio padrão<span class="cad">🔒</span></li>
+    <li><span class="num">11</span>Coeficiente de variação<span class="cad">🔒</span></li>
+    <li><span class="num">12</span>Forma da distribuição e boxplot<span class="cad">🔒</span></li>
+  </ol>
+</aside>
+
+<main id="principal">
+
+<!-- 0. CAPA -->
+<section class="secao visivel" data-s="0">
+  <div class="capa"><div class="dentro">
+    <div class="rotulo">Lição 3 de 12</div>
+    <h2>Representando dados com gráficos</h2>
+    <p style="color:#E4E7EB">Barras, histograma, polígono de frequências, setores e gráficos enganosos</p>
+    <div class="autor"><b>LC</b> Luiz de Castro</div>
+  </div></div>
+  <div class="bloco">
+    <div class="intro-audio">
+      <div class="ia-txt"><b>🎧 Introdução em áudio</b><span>Cerca de 2 minutos · contexto da Lição 3</span></div>
+      <button class="btn-audio" id="ouvirIntro">▶ Ouvir a introdução</button>
+      <details><summary>Ler a transcrição</summary><div id="introTexto">
+<p class="narra">Olá! Bem-vindo à Lição 3. Nas duas lições anteriores, organizamos os dados em tabelas: primeiro contando valor por valor, depois agrupando os valores em classes. Agora vamos transformar essas tabelas em imagens.</p>
+<p class="narra">Um gráfico bem escolhido revela num instante aquilo que uma tabela demora a mostrar. Mas um gráfico mal construído pode esconder ou exagerar a informação. Por isso, a pergunta desta lição não é qual gráfico é mais bonito, e sim qual gráfico responde melhor à pergunta que estou fazendo.</p>
+<p class="narra">Vamos partir de uma pesquisa com cinquenta estudantes sobre o meio de transporte que usam para ir à faculdade. Se a pergunta for qual meio é o mais usado, comparamos tamanhos, e o gráfico de barras faz isso muito bem. Se a pergunta for que parcela do total cada meio representa, entramos no terreno do gráfico de setores. E, voltando aos tempos de deslocamento da lição anterior, vamos ver o histograma e conhecer o polígono de frequências, que liga os pontos médios das classes e facilita comparar distribuições.</p>
+<p class="narra">Na parte final, você vai aprender a desconfiar. O eixo que não começa no zero, as escalas enganosas e os efeitos visuais que chamam mais atenção do que os dados aparecem com frequência na imprensa e em relatórios. Você mesmo vai mexer no eixo de um gráfico e ver uma diferença pequena parecer enorme.</p>
+<p class="narra">Na aula, você vai ligar e desligar boas práticas num gráfico de barras, construir um polígono ponto a ponto, decidir qual gráfico combina com cada situação e montar gráficos com os seus próprios dados. No final, um quiz baseado nos exercícios do livro. Vamos lá?</p>
+      </div></details>
+    </div>
+    <div class="citacao">Um bom gráfico deve permitir que o leitor compreenda o padrão dos dados sem precisar consultar a tabela que lhe deu origem.<small>TRIOLA, 2017</small></div>
+    <p>Um gráfico bem escolhido revela num instante o que uma tabela demora a mostrar. Ao final desta lição, você será capaz de:</p>
+    <ul class="objetivos" id="objetivos">
+      <li><span class="n">1</span>Escolher o gráfico pelo tipo de variável e pela pergunta</li>
+      <li><span class="n">2</span>Construir e ler gráficos de barras, histogramas e polígonos de frequências</li>
+      <li><span class="n">3</span>Saber quando o gráfico de setores funciona e quando não funciona</li>
+      <li><span class="n">4</span>Reconhecer gráficos que distorcem a leitura</li>
+    </ul>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="1">Começar</button></div>
+</section>
+
+<!-- 1. EXEMPLOS -->
+<section class="secao" data-s="1">
+  <div class="bloco">
+    <div class="rotulo">Antes das definições</div>
+    <h2>Três perguntas, três gráficos</h2>
+    <p>Explore as três situações. Repare que a pergunta muda de uma aba para outra.</p>
+    <div class="abas">
+      <button class="on" data-aba="a1">Qual o mais usado?</button>
+      <button data-aba="a2">Que parcela do total?</button>
+      <button data-aba="a3">Qual a forma?</button>
+    </div>
+    <div class="painel on" id="a1">
+      <p>Uma pesquisa perguntou a 50 estudantes qual meio de transporte usam para ir à faculdade: <b>ônibus, 19; carro, 12; a pé, 8; moto, 6; bicicleta, 5.</b></p>
+      <p>Para saber qual é o meio mais usado, basta comparar o tamanho de cada grupo. Comparar categorias é exatamente o que um <b>gráfico de barras</b> faz bem.</p>
+      <div id="exBarras"></div>
+    </div>
+    <div class="painel" id="a2">
+      <p>Agora a coordenação quer saber que fração dos 50 estudantes usa cada meio. Dividindo cada valor por 50: <b>ônibus 38%, carro 24%, a pé 16%, moto 12% e bicicleta 10%.</b></p>
+      <p>A pergunta é sobre o todo e suas partes, o tipo de informação que um <b>gráfico de setores</b> costuma apresentar, desde que haja poucas categorias.</p>
+      <div id="exSetores"></div>
+    </div>
+    <div class="painel" id="a3">
+      <p>Retomando os 20 estudantes da Lição 2, queremos ver a <b>forma</b> da distribuição dos tempos de deslocamento, e não só as contagens de cada classe.</p>
+      <p>A variável é contínua, então as barras ficam encostadas: é o <b>histograma</b>. Logo mais, veremos o <b>polígono de frequências</b>, que liga os pontos médios das classes.</p>
+      <div id="exHist"></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="2">Continuar</button></div>
+</section>
+
+<!-- 2. ESCOLHENDO -->
+<section class="secao" data-s="2">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Escolhendo o gráfico certo</div>
+    <h2>Dois fatores decidem: o tipo de variável e a pergunta</h2>
+    <p>Clique em cada cartão para ver quando usar cada gráfico.</p>
+    <div class="cartoes quatro">
+      <button class="cartao"><div class="giro"><div class="face frente">📊 Gráfico de barras<small>Clique para virar</small></div><div class="face verso">Variáveis qualitativas e discretas com poucas categorias. Compara categorias, com barras separadas.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">▇ Histograma<small>Clique para virar</small></div><div class="face verso">Variáveis contínuas agrupadas em classes. É o padrão, com barras encostadas.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">📈 Polígono de frequências<small>Clique para virar</small></div><div class="face verso">Liga os pontos médios das classes. Serve para comparar distribuições ou destacar a tendência.</div></div></button>
+      <button class="cartao"><div class="giro"><div class="face frente">◔ Gráfico de setores<small>Clique para virar</small></div><div class="face verso">Responde a uma pergunta específica: a parcela de cada categoria no todo, com poucas categorias.</div></div></button>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="3">Continuar</button></div>
+</section>
+
+<!-- 3. BARRAS: BOAS PRÁTICAS -->
+<section class="secao" data-s="3">
+  <div class="bloco">
+    <div class="rotulo">Gráfico de barras</div>
+    <h2>Três boas práticas que mudam a leitura</h2>
+    <p>No gráfico de barras, cada categoria recebe uma barra separada, e a altura é proporcional à frequência. As barras não se encostam, porque as categorias não têm continuidade entre si.</p>
+    <p>Ligue e desligue as três boas práticas e observe o efeito no gráfico.</p>
+    <div class="praticas">
+      <label><input type="checkbox" id="bpOrdenar"> Ordenar as categorias pela frequência</label>
+      <label><input type="checkbox" id="bpZero"> Começar o eixo das frequências no zero</label>
+      <label><input type="checkbox" id="bpRotulos"> Rotular as barras com os valores</label>
+    </div>
+    <div id="bpGrafico"></div>
+    <p class="fonte" id="bpLeg">Figura 3 – Meio de transporte usado por 50 estudantes para ir à faculdade (dados fictícios). Fonte: elaboração do autor.</p>
+    <div class="retorno ok" id="bpMsg" style="display:none">Com as três práticas, a leitura fica imediata: o ônibus lidera, e cada barra mostra o seu valor. Ordenar só faz sentido quando as categorias não têm uma ordem natural.</div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="4" data-trava="bp">Continuar</button><div class="dica-trava">Ligue as três boas práticas para continuar</div></div>
+</section>
+
+<!-- 4. HISTOGRAMA E POLÍGONO -->
+<section class="secao" data-s="4">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Histograma e polígono de frequências</div>
+    <h2>Construindo o polígono, ponto a ponto</h2>
+    <p>O histograma, da Lição 2, representa uma variável contínua em classes de mesma amplitude, com barras encostadas. O <b>polígono de frequências</b> é construído marcando, para cada classe, um ponto na altura da sua frequência, situado no <b>ponto médio</b> da classe. Depois, os pontos são ligados por segmentos de reta.</p>
+    <div class="controles">
+      <button class="btn-sec" id="polUm">Marcar próximo ponto</button>
+      <button class="btn-sec" id="polTudo">Marcar todos</button>
+      <button class="btn-sec" id="polReset">Recomeçar</button>
+      <label class="chk"><input type="checkbox" id="polHist" checked> Mostrar histograma ao fundo</label>
+    </div>
+    <div id="polGrafico"></div>
+    <p class="dd-msg" id="polMsg" style="text-align:left;font-weight:normal"></p>
+    <p class="fonte">Figura 4 – Polígono de frequências dos tempos de deslocamento de 20 estudantes (dados fictícios). Fonte: elaboração do autor, a partir dos dados da Tabela 2.</p>
+  </div></div>
+  <div class="bloco" style="padding-top:20px">
+    <div class="questao" data-q="pol">
+      <div class="enunciado">Por que o polígono começa no ponto (4; 0) e termina no ponto (40; 0)?</div>
+      <button class="opcao"><span class="radio"></span>Porque há estudantes que levam 4 e 40 minutos</button>
+      <button class="opcao" data-certa><span class="radio"></span>Porque acrescentamos uma classe com frequência zero em cada extremidade, para a figura começar e terminar na linha de base</button>
+      <button class="opcao"><span class="radio"></span>Porque o eixo horizontal precisa começar em zero</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Isso mesmo. São classes “vazias”, antes da primeira e depois da última, com pontos médios 4 e 40 minutos. Elas fecham a figura na linha de base." data-nao="Não é essa. Nenhum estudante leva 4 ou 40 minutos. Acrescentamos uma classe de frequência zero em cada extremidade, com pontos médios 4 e 40, para a figura começar e terminar na linha de base."></div>
+    </div>
+    <div class="citacao" style="margin-top:28px">O polígono é especialmente útil para comparar duas distribuições no mesmo gráfico, porque as linhas se sobrepõem de forma legível.</div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="5" data-trava="pol">Continuar</button><div class="dica-trava">Construa o polígono e responda a questão para continuar</div></div>
+</section>
+
+<!-- 5. SETORES -->
+<section class="secao" data-s="5">
+  <div class="bloco">
+    <div class="rotulo">Gráfico de setores</div>
+    <h2>Parte do todo, com poucas categorias</h2>
+    <p>O gráfico de setores divide um círculo em fatias proporcionais às frequências relativas. É adequado para mostrar a parcela de cada categoria no total quando há poucas categorias, em geral não mais que quatro ou cinco.</p>
+    <div class="setores-wrap">
+      <div id="setGrafico"></div>
+      <div>
+        <table class="freq" id="setTabela"></table>
+        <p class="fonte">Tabela 3 – Meio de transporte de 50 estudantes (dados fictícios). Fonte: elaboração do autor. Passe o mouse ou toque numa linha para destacar a fatia.</p>
+      </div>
+    </div>
+    <div class="acordeao">
+      <details><summary>Uma limitação importante</summary><div class="corpo"><p>As pessoas comparam comprimentos com mais precisão do que ângulos e áreas. Por isso, setores muito parecidos, ou com muitas categorias, são difíceis de ler, e um gráfico de barras costuma ser mais eficiente.</p></div></details>
+      <details><summary>E os setores em 3D?</summary><div class="corpo"><p>Gráficos de setores tridimensionais, além de dificultarem a leitura, distorcem as proporções e devem ser evitados.</p></div></details>
+    </div>
+    <div class="questao" data-q="set">
+      <div class="enunciado">Um pesquisador quer representar a preferência de 600 pessoas entre doze gêneros musicais, com parcelas parecidas entre si, num gráfico de setores. Qual é a melhor avaliação?</div>
+      <button class="opcao"><span class="radio"></span>Boa escolha, porque o gráfico de setores sempre mostra partes de um todo</button>
+      <button class="opcao"><span class="radio"></span>Boa escolha, desde que seja em 3D, para destacar as fatias</button>
+      <button class="opcao" data-certa><span class="radio"></span>Escolha inadequada: um gráfico de barras horizontais, ordenado e rotulado, é melhor</button>
+      <button class="btn-enviar" disabled>ENVIAR</button>
+      <div class="retorno" data-ok="Correto. Com doze categorias parecidas, os ângulos ficam muito próximos e o gráfico satura de cores. Barras horizontais ordenadas e rotuladas permitem comparar por comprimento, que percebemos com mais precisão." data-nao="Não é essa. Com doze categorias de parcelas parecidas, os setores ficam quase iguais e indistinguíveis (e o 3D só pioraria). A alternativa é um gráfico de barras horizontais, ordenado pela frequência, com os valores rotulados."></div>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="6" data-trava="set">Continuar</button><div class="dica-trava">Responda a questão para continuar</div></div>
+</section>
+
+<!-- 6. ERROS -->
+<section class="secao" data-s="6">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Erros que distorcem a leitura</div>
+    <h2>Mexa no eixo e veja o gráfico mentir</h2>
+    <p>Um jornal publicou um gráfico de barras com dois valores: <b>92% em 2024</b> e <b>96% em 2025</b>. Arraste o controle para mudar onde o eixo vertical começa.</p>
+    <div class="painel-calc">
+      <label for="eixoMin">O eixo vertical começa em: <b id="eixoVal">0%</b></label>
+      <input type="range" id="eixoMin" min="0" max="90" step="5" value="0">
+      <div class="eixo-grid">
+        <div id="eixoGrafico"></div>
+        <div class="caixas uma-col">
+          <div class="caixa destaque-cx"><span>A barra de 2025 parece</span><b id="eixoParece">1,04×</b><span>a barra de 2024</span></div>
+          <div class="caixa"><span>Variação real</span><b>4 pontos percentuais</b><span>(96 − 92) / 92 ≈ 4,3%</span></div>
+        </div>
+      </div>
+      <p class="fonte" id="eixoMsg"></p>
+    </div>
+    <h3 style="margin-top:30px">Outros artifícios comuns</h3>
+    <div class="acordeao">
+      <details><summary>Dois eixos verticais com escalas diferentes</summary><div class="corpo"><p>Usar dois eixos verticais com escalas diferentes no mesmo gráfico permite sugerir correlações que não existem.</p></div></details>
+      <details><summary>Cores e efeitos chamativos</summary><div class="corpo"><p>Cores ou efeitos que chamam mais atenção do que os próprios dados atrapalham a leitura.</p></div></details>
+      <details><summary>Para saber mais</summary><div class="corpo"><p>A obra clássica de Darrell Huff sobre o tema, <i>Como mentir com estatística</i> (HUFF, 1954), discute esses artifícios com exemplos que valem a leitura.</p></div></details>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="7" data-trava="eixo">Continuar</button><div class="dica-trava">Mova o controle do eixo para continuar</div></div>
+</section>
+
+<!-- 7. ARRASTAR -->
+<section class="secao" data-s="7">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Atividade</div>
+    <h2>Qual gráfico para cada situação?</h2>
+    <p>Arraste cada situação para o gráfico mais adequado.</p>
+    <p class="fonte">No celular, toque na situação e depois toque no gráfico.</p>
+    <div class="dd-banco" id="ddBanco"></div>
+    <div class="dd-zonas" id="ddZonas">
+      <div class="dd-zona" data-z="barras"><h4>Barras<small>categorias ou valores discretos</small></h4></div>
+      <div class="dd-zona" data-z="hist"><h4>Histograma<small>contínua, em classes</small></h4></div>
+      <div class="dd-zona" data-z="pol"><h4>Polígono<small>comparar distribuições</small></h4></div>
+      <div class="dd-zona" data-z="set"><h4>Setores<small>parte do todo, poucas categorias</small></h4></div>
+    </div>
+    <div class="dd-msg" id="ddMsg"></div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="8" data-trava="dd">Continuar</button><div class="dica-trava">Classifique todas as situações para continuar</div></div>
+</section>
+
+<!-- 8. LABORATÓRIO -->
+<section class="secao" data-s="8">
+  <div class="bloco largo"><div class="dentro">
+    <div class="atividade">
+      <div class="rotulo">Laboratório</div>
+      <h3 style="color:#fff">Seus dados em barras e em setores</h3>
+      <p>Digite categorias e frequências, uma por linha, como no exemplo. Veja os dois gráficos lado a lado e decida qual responde melhor à sua pergunta.</p>
+    </div>
+    <div style="margin-top:20px">
+      <textarea id="labDados" rows="5" placeholder="Camisas 12&#10;Calças 8&#10;Vestidos 6&#10;Bermudas 4"></textarea>
+      <div class="erro-txt" id="labErro"></div>
+      <div class="controles">
+        <button class="btn-sec" id="labGerar">Gerar gráficos</button>
+        <button class="btn-sec" id="labExemplo">Usar o exemplo da loja de roupas</button>
+      </div>
+      <div id="labAviso"></div>
+      <div class="comparar" id="labGraficos"></div>
+      <div id="labTabela"></div>
+    </div>
+  </div></div>
+  <div class="continuar-wrap" style="background:var(--fundo)"><button class="continuar" data-prox="9">Continuar</button></div>
+</section>
+
+<!-- 9. RESUMO -->
+<section class="secao" data-s="9">
+  <div class="bloco">
+    <div class="rotulo">Resumo da lição</div>
+    <h2>O que você aprendeu</h2>
+    <div class="acordeao">
+      <details><summary>A regra de ouro</summary><div class="corpo"><p>A escolha do gráfico depende do tipo de variável e da pergunta a ser respondida.</p></div></details>
+      <details><summary>Barras</summary><div class="corpo"><p>Comparam categorias ou valores discretos, com barras separadas.</p></div></details>
+      <details><summary>Histograma</summary><div class="corpo"><p>Representa variáveis contínuas em classes contíguas, com barras encostadas.</p></div></details>
+      <details><summary>Polígono de frequências</summary><div class="corpo"><p>Conecta os pontos médios das classes e facilita a comparação entre distribuições.</p></div></details>
+      <details><summary>Setores</summary><div class="corpo"><p>Mostram partes de um todo, desde que haja poucas categorias.</p></div></details>
+      <details><summary>Cuidados</summary><div class="corpo"><p>Evite eixos que distorcem a leitura, escalas enganosas e efeitos visuais que chamam mais atenção do que os dados.</p></div></details>
+    </div>
+  </div>
+  <div class="continuar-wrap"><button class="continuar" data-prox="10">Ir para o quiz</button></div>
+</section>
+
+<!-- 10. QUIZ -->
+<section class="secao" data-s="10">
+  <div class="bloco largo"><div class="dentro">
+    <div class="rotulo">Lição 3 · Avaliação</div>
+    <h2>Quiz</h2>
+    <p>Cinco questões baseadas nos exercícios do Capítulo 3.</p>
+    <div id="quiz"></div>
+  </div></div>
+</section>
+
+<footer class="fim">Conteúdo: <i>Estatística Descritiva: aprendendo com a vida real</i>, de Luiz de Castro · DeCastro – O Canal do Conhecimento</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var TOTAL=11, CHAVE="decastro-estat-l3", estado={s:0,travas:{}};
+try{ var g=localStorage.getItem(CHAVE); if(g) estado=JSON.parse(g); }catch(e){}
+function salvar(){ try{ localStorage.setItem(CHAVE, JSON.stringify(estado)); }catch(e){} }
+function br(v,d){ return v.toFixed(d).replace(".",","); }
+var LAR="#E4572E", CORES=["#E4572E","#1F2933","#F2A541","#2F9E6E","#7B8794","#C2421D","#5C7AEA","#B5838D","#3E4C59","#9AA5B1","#FFB199","#6B9080"];
+
+var secoes=Array.prototype.slice.call(document.querySelectorAll(".secao")), aoAbrir={};
+function atualizarProgresso(){ var p=estado.quizFeito?100:Math.round((estado.s+1)/TOTAL*100); document.getElementById("pct").textContent=p; document.getElementById("barra").style.width=p+"%"; }
+function liberar(ch){ if(estado.travas[ch]) return; estado.travas[ch]=true; salvar(); document.querySelectorAll('.continuar[data-trava="'+ch+'"]').forEach(function(b){ b.disabled=false; var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }); }
+document.querySelectorAll(".continuar").forEach(function(b){
+  if(b.dataset.trava && !estado.travas[b.dataset.trava]) b.disabled=true; else { var d=b.parentNode.querySelector(".dica-trava"); if(d) d.style.display="none"; }
+  b.addEventListener("click", function(){ var n=+b.dataset.prox; estado.s=Math.max(estado.s,n); salvar(); var a=document.querySelector('.secao[data-s="'+n+'"]'); a.classList.add("visivel"); b.parentNode.style.display="none"; atualizarProgresso(); if(aoAbrir[n]) aoAbrir[n](); setTimeout(function(){ a.scrollIntoView({behavior:"smooth",block:"start"}); },60); });
+});
+document.querySelectorAll("#objetivos li").forEach(function(li,i){ setTimeout(function(){li.classList.add("on");},400+i*350); });
+document.getElementById("btnMenu").addEventListener("click", function(){ document.getElementById("lateral").classList.toggle("aberta"); });
+document.querySelectorAll(".abas button").forEach(function(b){ b.addEventListener("click", function(){ var pai=b.parentNode, bl=pai.parentNode; pai.querySelectorAll("button").forEach(function(x){x.classList.remove("on");}); bl.querySelectorAll(".painel").forEach(function(x){x.classList.remove("on");}); b.classList.add("on"); document.getElementById(b.dataset.aba).classList.add("on"); }); });
+document.querySelectorAll(".cartao").forEach(function(c){ c.addEventListener("click", function(){ c.classList.toggle("virado"); }); });
+document.querySelectorAll(".questao[data-q]").forEach(function(q){
+  var ops=q.querySelectorAll(".opcao"), env=q.querySelector(".btn-enviar"), ret=q.querySelector(".retorno"), esc=null, feito=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(feito) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); esc=o; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!esc) return;
+    if(env.textContent==="TENTAR DE NOVO"){ ops.forEach(function(x){x.classList.remove("sel","certa","errada");}); ret.className="retorno"; env.textContent="ENVIAR"; env.disabled=true; esc=null; feito=false; return; }
+    feito=true; var ok=esc.hasAttribute("data-certa"); esc.classList.add(ok?"certa":"errada"); ret.textContent=ok?ret.dataset.ok:ret.dataset.nao; ret.className="retorno "+(ok?"ok":"nao");
+    if(ok){ env.style.display="none"; if(q.dataset.q==="pol") estado.polQ=true, checaPol(); else liberar(q.dataset.q); } else env.textContent="TENTAR DE NOVO"; });
+});
+
+/* ---------- gráficos SVG ---------- */
+function eixoY(s,m,ih,W,yMin,yMax,passo,suf){
+  for(var k=yMin;k<=yMax+1e-9;k+=passo){ var y=m.t+ih-ih*(k-yMin)/(yMax-yMin);
+    s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" stroke="#E4E7EB"/><text x="'+(m.l-8)+'" y="'+(y+4)+'" font-size="12" text-anchor="end" fill="#7B8794">'+(Math.round(k*10)/10).toString().replace(".",",")+(suf||"")+'</text>'); }
+}
+function passoBonito(x){ if(x<=1) return 1; var p=Math.pow(10,Math.floor(Math.log10(x))), r=x/p; return (r<=1?1:r<=2?2:r<=5?5:10)*p; }
+function barras(dados,o){
+  o=o||{}; var W=o.W||560,H=o.H||300,m={l:48,r:16,t:24,b:52}, iw=W-m.l-m.r, ih=H-m.t-m.b;
+  var yMax=o.yMax||Math.max.apply(null,dados.map(function(d){return d[1];})), yMin=o.yMin||0, passo=o.passo||passoBonito((yMax-yMin)/5);
+  yMax=yMin+Math.ceil((yMax-yMin)/passo)*passo;
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(o.aria||"Gráfico de barras")+'">'];
+  eixoY(s,m,ih,W,yMin,yMax,passo,o.suf);
+  var bw=iw/dados.length;
+  dados.forEach(function(d,i){ var h=Math.max(0,ih*(d[1]-yMin)/(yMax-yMin)), x=m.l+i*bw+bw*.18, w=bw*.64;
+    s.push('<rect x="'+x+'" y="'+(m.t+ih-h)+'" width="'+w+'" height="'+h+'" fill="'+(d[2]||LAR)+'" rx="2"><title>'+d[0]+': '+d[1]+(o.suf||"")+'</title></rect>');
+    if(o.rotulos) s.push('<text x="'+(x+w/2)+'" y="'+(m.t+ih-h-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">'+String(d[1]).replace(".",",")+(o.suf||"")+'</text>');
+    s.push('<text x="'+(x+w/2)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+d[0]+'</text>'); });
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+(m.t+ih)+'" y2="'+(m.t+ih)+'" stroke="#9AA5B1"/>');
+  if(o.yMin) s.push('<text x="'+(W-m.r)+'" y="'+(m.t-8)+'" font-size="12" font-weight="700" text-anchor="end" fill="#D64545">⚠ o eixo não começa no zero</text>');
+  if(o.eixoX) s.push('<text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">'+o.eixoX+'</text>');
+  s.push('<text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">'+(o.eixoY||"Frequência (f)")+'</text></svg>');
+  return s.join("");
+}
+var CL=[[7,13,5],[13,19,5],[19,25,5],[25,31,3],[31,37,2]];
+function histPol(o){
+  o=o||{}; var W=560,H=300,m={l:44,r:16,t:24,b:52}, iw=W-m.l-m.r, ih=H-m.t-m.b, x0=o.pol?1:7, x1=o.pol?43:37, yMax=6;
+  function X(v){ return m.l+iw*(v-x0)/(x1-x0); } function Y(v){ return m.t+ih-ih*v/yMax; }
+  var s=['<svg class="grafico" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Histograma e polígono de frequências">'];
+  eixoY(s,m,ih,W,0,yMax,1);
+  if(o.hist!==false) CL.forEach(function(c){ s.push('<rect x="'+X(c[0])+'" y="'+Y(c[2])+'" width="'+(X(c[1])-X(c[0]))+'" height="'+(Y(0)-Y(c[2]))+'" fill="'+(o.pol?"#FBD5C8":LAR)+'" stroke="#fff" stroke-width="1.5"><title>['+c[0]+'; '+c[1]+'): '+c[2]+'</title></rect>'); if(!o.pol) s.push('<text x="'+(X(c[0])+X(c[1]))/2+'" y="'+(Y(c[2])-6)+'" font-size="13" font-weight="700" text-anchor="middle" fill="#1F2933">'+c[2]+'</text>'); });
+  var marcas=o.pol?[1,7,13,19,25,31,37,43]:[7,13,19,25,31,37];
+  marcas.forEach(function(v){ s.push('<text x="'+X(v)+'" y="'+(m.t+ih+18)+'" font-size="12" text-anchor="middle" fill="#3E4C59">'+v+'</text>'); });
+  if(o.pol){
+    var pts=o.pontos||[];
+    if(pts.length>1) s.push('<polyline points="'+pts.map(function(p){return X(p[0])+","+Y(p[1]);}).join(" ")+'" fill="none" stroke="#1F2933" stroke-width="2.5" stroke-linejoin="round"/>');
+    pts.forEach(function(p,i){ s.push('<circle cx="'+X(p[0])+'" cy="'+Y(p[1])+'" r="'+(i===pts.length-1?7:5)+'" fill="'+(i===pts.length-1?LAR:"#1F2933")+'" stroke="#fff" stroke-width="2"><title>('+p[0]+'; '+p[1]+')</title></circle><text x="'+X(p[0])+'" y="'+(Y(p[1])-12)+'" font-size="11" text-anchor="middle" fill="#1F2933">('+p[0]+'; '+p[1]+')</text>'); });
+  }
+  s.push('<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="#9AA5B1"/>');
+  s.push('<text x="'+(m.l+iw/2)+'" y="'+(H-8)+'" font-size="12" text-anchor="middle" fill="#7B8794">Tempo de deslocamento (minutos)</text>');
+  s.push('<text transform="translate(12 '+(m.t+ih/2)+') rotate(-90)" font-size="12" text-anchor="middle" fill="#7B8794">Frequência (f)</text></svg>');
+  return s.join("");
+}
+function setores(dados,o){
+  o=o||{}; var tot=dados.reduce(function(a,d){return a+d[1];},0), R=110, cx=130, cy=130, ang=-Math.PI/2;
+  var s=['<svg class="grafico pizza" viewBox="0 0 260 260" role="img" aria-label="Gráfico de setores">'];
+  dados.forEach(function(d,i){
+    var a=d[1]/tot*2*Math.PI, x1=cx+R*Math.cos(ang), y1=cy+R*Math.sin(ang), x2=cx+R*Math.cos(ang+a), y2=cy+R*Math.sin(ang+a), meio=ang+a/2;
+    var path = dados.length===1 ? '<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'"' : '<path d="M'+cx+','+cy+' L'+x1+','+y1+' A'+R+','+R+' 0 '+(a>Math.PI?1:0)+' 1 '+x2+','+y2+' Z"';
+    s.push('<g class="fatia" data-i="'+i+'">'+path+' fill="'+CORES[i%CORES.length]+'" stroke="#fff" stroke-width="2"><title>'+d[0]+': '+br(d[1]/tot*100,1).replace(",0","")+'%</title></'+(dados.length===1?'circle':'path')+'>');
+    if(d[1]/tot>=0.07) s.push('<text x="'+(cx+R*.64*Math.cos(meio))+'" y="'+(cy+R*.64*Math.sin(meio)+4)+'" font-size="12" font-weight="700" text-anchor="middle" fill="#fff">'+Math.round(d[1]/tot*100)+'%</text>');
+    s.push('</g>'); ang+=a; });
+  return s.join("")+'</svg>';
+}
+function legenda(dados){ var tot=dados.reduce(function(a,d){return a+d[1];},0); return '<div class="legenda">'+dados.map(function(d,i){return '<span><i style="background:'+CORES[i%CORES.length]+'"></i>'+d[0]+' ('+br(d[1]/tot*100,1).replace(",0","")+'%)</span>';}).join("")+'</div>'; }
+
+/* exemplos */
+var TRANSP=[["Ônibus",19],["Carro",12],["A pé",8],["Moto",6],["Bicicleta",5]];
+document.getElementById("exBarras").innerHTML=barras(TRANSP,{rotulos:true,eixoX:"Meio de transporte"});
+document.getElementById("exSetores").innerHTML='<div style="max-width:300px;margin:0 auto">'+setores(TRANSP)+'</div>'+legenda(TRANSP);
+document.getElementById("exHist").innerHTML=histPol();
+
+/* boas práticas */
+var bpO=document.getElementById("bpOrdenar"), bpZ=document.getElementById("bpZero"), bpR=document.getElementById("bpRotulos");
+function boasPraticas(){
+  var d=bpO.checked ? TRANSP.slice() : TRANSP.slice().sort(function(a,b){return a[0].localeCompare(b[0],"pt");});
+  document.getElementById("bpGrafico").innerHTML=barras(d,{rotulos:bpR.checked,yMin:bpZ.checked?0:4,yMax:20,passo:bpZ.checked?5:4,eixoX:"Meio de transporte"});
+  var tudo=bpO.checked&&bpZ.checked&&bpR.checked; document.getElementById("bpMsg").style.display=tudo?"block":"none"; if(tudo) liberar("bp");
+}
+[bpO,bpZ,bpR].forEach(function(c){ c.addEventListener("change", boasPraticas); }); boasPraticas();
+
+/* polígono */
+var PONTOS=[[4,0],[10,5],[16,5],[22,5],[28,3],[34,2],[40,0]], polN=0;
+var polMsgs=["Classe extra antes da primeira: ponto médio 4, frequência 0. Ela faz a figura começar na linha de base.","Classe [7; 13): ponto médio (7 + 13) / 2 = 10, frequência 5.","Classe [13; 19): ponto médio 16, frequência 5.","Classe [19; 25): ponto médio 22, frequência 5.","Classe [25; 31): ponto médio 28, frequência 3.","Classe [31; 37): ponto médio 34, frequência 2.","Classe extra depois da última: ponto médio 40, frequência 0. O polígono está fechado."];
+function desenharPol(){
+  document.getElementById("polGrafico").innerHTML=histPol({pol:true,hist:document.getElementById("polHist").checked,pontos:PONTOS.slice(0,polN)});
+  document.getElementById("polMsg").textContent = polN ? polMsgs[polN-1] : "Clique em “Marcar próximo ponto” para começar.";
+  document.getElementById("polUm").disabled=document.getElementById("polTudo").disabled=polN>=PONTOS.length;
+  if(polN>=PONTOS.length){ estado.polFeito=true; checaPol(); }
+}
+function checaPol(){ if(estado.polFeito&&estado.polQ) liberar("pol"); }
+document.getElementById("polUm").addEventListener("click", function(){ if(polN<PONTOS.length){polN++; desenharPol();} });
+document.getElementById("polTudo").addEventListener("click", function(){ var b=this; b.disabled=true; var t=setInterval(function(){ if(polN>=PONTOS.length){clearInterval(t);return;} polN++; desenharPol(); },450); });
+document.getElementById("polReset").addEventListener("click", function(){ polN=0; desenharPol(); });
+document.getElementById("polHist").addEventListener("change", desenharPol);
+desenharPol();
+
+/* setores + tabela */
+document.getElementById("setGrafico").innerHTML=setores(TRANSP);
+document.getElementById("setTabela").innerHTML='<tr><th>Meio de transporte</th><th>f</th><th>f (%)</th></tr>'+TRANSP.map(function(d,i){return '<tr data-i="'+i+'"><td style="text-align:left"><i class="bolinha" style="background:'+CORES[i]+'"></i>'+d[0]+'</td><td>'+d[1]+'</td><td>'+(d[1]*2)+'%</td></tr>';}).join("")+'<tr class="total"><td>Total</td><td>50</td><td>100%</td></tr>';
+function realce(i){ document.querySelectorAll("#setGrafico .fatia").forEach(function(f){ f.style.opacity = (i===null||+f.dataset.i===i)?1:.25; }); document.querySelectorAll("#setTabela tr[data-i]").forEach(function(r){ r.classList.toggle("pisca", +r.dataset.i===i); }); }
+document.querySelectorAll("#setTabela tr[data-i], #setGrafico .fatia").forEach(function(el){
+  el.addEventListener("mouseenter", function(){ realce(+el.dataset.i); }); el.addEventListener("mouseleave", function(){ realce(null); });
+  el.addEventListener("click", function(){ realce(+el.dataset.i); });
+});
+
+/* eixo enganoso */
+var eixo=document.getElementById("eixoMin"), mexeu=false;
+function eixoEng(){
+  var mn=+eixo.value;
+  document.getElementById("eixoVal").textContent=mn+"%";
+  document.getElementById("eixoGrafico").innerHTML=barras([["2024",92,"#7B8794"],["2025",96,LAR]],{rotulos:true,suf:"%",yMin:mn,yMax:100,passo:(100-mn)/5,eixoY:"Percentual",W:420,H:300});
+  var r=(96-mn)/(92-mn);
+  document.getElementById("eixoParece").textContent=br(r,r<1.1?2:1)+"×";
+  document.getElementById("eixoMsg").textContent = mn===0 ? "Com o eixo no zero, as barras são quase iguais, como os valores." : (r>=2.5 ? "Com o eixo em "+mn+"%, a barra de 2025 parece "+br(r,1)+" vezes maior, embora a variação real seja de apenas 4 pontos percentuais." : "Repare como a diferença visual cresce à medida que o eixo sobe.");
+}
+eixo.addEventListener("input", function(){ eixoEng(); if(!mexeu&&+eixo.value>=60){ mexeu=true; liberar("eixo"); } });
+eixoEng();
+
+/* arrastar */
+var ITENS=[["Qual meio de transporte é o mais usado","barras"],["Livros lidos no ano por pessoa, de 0 a 10","barras"],["Tempo de espera de clientes, agrupado em classes","hist"],["Tempo de deslocamento de 20 estudantes, em classes","hist"],["Comparar as notas de duas turmas diferentes","pol"],["Parcela de moradores em casa, apartamento ou outro tipo","set"],["Fração dos 50 estudantes que usa cada meio de transporte","set"]];
+var EXPL={barras:"comparar categorias ou valores discretos pede barras separadas",hist:"variável contínua agrupada em classes contíguas pede histograma",pol:"linhas sobrepostas permitem comparar o formato de duas distribuições",set:"parte do todo, com poucas categorias, cabe num gráfico de setores"};
+var banco=document.getElementById("ddBanco"), zonas=document.querySelectorAll("#ddZonas .dd-zona"), msg=document.getElementById("ddMsg"), rest=ITENS.length, sel=null;
+ITENS.slice().sort(function(){return Math.random()-.5;}).forEach(function(it){ var d=document.createElement("div"); d.className="dd-item"; d.textContent=it[0]; d.dataset.z=it[1]; banco.appendChild(d); ligarDrag(d); });
+function soltar(item,zona){ if(!zona) return;
+  if(zona.dataset.z===item.dataset.z){ item.classList.remove("selecionado"); item.classList.add("fixo"); zona.appendChild(item); msg.style.color="var(--verde)"; msg.textContent="Correto: "+EXPL[item.dataset.z]+"."; rest--; sel=null; if(rest===0){ msg.textContent="Muito bem! Todas as situações estão com o gráfico certo."; liberar("dd"); } }
+  else { item.classList.add("tremer"); setTimeout(function(){item.classList.remove("tremer");},400); msg.style.color="var(--vermelho)"; msg.textContent="Ainda não. Pergunte-se: a variável é contínua ou são categorias? A pergunta é comparar, ver a forma ou mostrar parte do todo?"; } }
+function ligarDrag(el){ var f=null,ox=0,oy=0,mv=false,x0=0,y0=0;
+  el.addEventListener("pointerdown",function(e){ if(el.classList.contains("fixo")) return; mv=false; x0=e.clientX; y0=e.clientY; var r=el.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointermove",function(e){ if(!el.hasPointerCapture(e.pointerId)) return; if(!mv&&Math.abs(e.clientX-x0)+Math.abs(e.clientY-y0)<6) return;
+    if(!mv){ mv=true; f=el.cloneNode(true); f.classList.add("fantasma"); f.style.width=el.offsetWidth+"px"; document.body.appendChild(f); el.style.opacity=".3"; }
+    f.style.left=(e.clientX-ox)+"px"; f.style.top=(e.clientY-oy)+"px"; zonas.forEach(function(z){z.classList.remove("alvo");}); var z=zonaEm(e.clientX,e.clientY); if(z) z.classList.add("alvo"); });
+  el.addEventListener("pointerup",function(e){ if(el.classList.contains("fixo")) return; zonas.forEach(function(z){z.classList.remove("alvo");});
+    if(mv){ f.remove(); f=null; el.style.opacity=""; soltar(el,zonaEm(e.clientX,e.clientY)); }
+    else { document.querySelectorAll(".dd-item.selecionado").forEach(function(x){x.classList.remove("selecionado");}); if(sel===el) sel=null; else { sel=el; el.classList.add("selecionado"); } } });
+}
+function zonaEm(x,y){ var el=document.elementFromPoint(x,y); return el?el.closest(".dd-zona"):null; }
+zonas.forEach(function(z){ z.addEventListener("click", function(){ if(sel) soltar(sel,z); }); });
+
+/* laboratório */
+function lab(){
+  var erro=document.getElementById("labErro"); erro.textContent="";
+  var linhas=document.getElementById("labDados").value.split(/\n/).map(function(l){return l.trim();}).filter(Boolean), dados=[];
+  for(var i=0;i<linhas.length;i++){ var m=linhas[i].match(/^(.+?)[\s:;=-]+(\d+(?:[.,]\d+)?)$/); if(!m){ erro.textContent="Não entendi a linha “"+linhas[i]+"”. Use o formato: Categoria 12"; return; } dados.push([m[1].trim().slice(0,22),Number(m[2].replace(",","."))]); }
+  if(dados.length<2){ erro.textContent="Digite pelo menos duas categorias."; return; }
+  if(dados.length>12){ erro.textContent="Use no máximo 12 categorias."; return; }
+  if(dados.some(function(d){return d[1]<0;})||dados.every(function(d){return d[1]===0;})){ erro.textContent="As frequências precisam ser positivas."; return; }
+  var ord=dados.slice().sort(function(a,b){return b[1]-a[1];}), tot=dados.reduce(function(a,d){return a+d[1];},0);
+  var aviso=""; if(dados.length>5) aviso='<div class="retorno nao" style="display:block">Com '+dados.length+' categorias, o gráfico de setores fica difícil de ler. Prefira as barras, ordenadas e rotuladas.</div>';
+  else aviso='<div class="retorno ok" style="display:block">Com '+dados.length+' categorias, os dois gráficos funcionam. Use os setores se a pergunta for “que parcela do total?”; as barras, se for “qual é maior?”.</div>';
+  document.getElementById("labAviso").innerHTML=aviso;
+  document.getElementById("labGraficos").innerHTML='<div><h3>Barras (ordenadas)</h3>'+barras(ord,{rotulos:true})+'</div><div><h3>Setores</h3><div style="max-width:280px;margin:0 auto">'+setores(ord)+'</div>'+legenda(ord)+'</div>';
+  document.getElementById("labTabela").innerHTML='<table class="freq"><tr><th>Categoria</th><th>f</th><th>f (%)</th></tr>'+ord.map(function(d){return '<tr><td style="text-align:left">'+d[0]+'</td><td>'+String(d[1]).replace(".",",")+'</td><td>'+br(d[1]/tot*100,1).replace(",0","")+'%</td></tr>';}).join("")+'<tr class="total"><td>Total</td><td>'+String(tot).replace(".",",")+'</td><td>100%</td></tr></table>';
+}
+document.getElementById("labGerar").addEventListener("click", lab);
+document.getElementById("labExemplo").addEventListener("click", function(){ document.getElementById("labDados").value="Camisas 12\nCalças 8\nVestidos 6\nBermudas 4"; lab(); });
+
+/* quiz */
+var QUIZ=[
+ {e:"Uma loja vendeu 30 peças de roupa: 12 camisas, 8 calças, 6 vestidos e 4 bermudas. Qual a porcentagem de camisas?", o:["12%","30%","40%","26,7%"], c:2, x:"12/30 = 0,40, ou seja, 40%. As demais: calças ≈ 26,7%, vestidos 20% e bermudas ≈ 13,3%. Com quatro categorias, o gráfico de setores é uma escolha razoável."},
+ {e:"Qual é o gráfico mais adequado para a quantidade de livros lidos no ano por cada pessoa de um grupo, com valores de 0 a 10?", o:["Histograma","Gráfico de barras","Gráfico de setores","Polígono de frequências"], c:1, x:"A variável é discreta, com valores separados (0, 1, 2…). As barras ficam afastadas, porque não há valores intermediários."},
+ {e:"No polígono de frequências dos tempos de deslocamento (classes de 7 a 37 minutos, amplitude 6), qual é o último ponto marcado?", o:["(37; 0)","(34; 2)","(40; 0)","(43; 0)"], c:2, x:"Depois da última classe, [31; 37), acrescenta-se uma classe de frequência zero cujo ponto médio é 40. O último ponto é (40; 0)."},
+ {e:"Um gráfico mostra 92% em 2024 e 96% em 2025, com o eixo começando em 90%. Qual é a variação relativa real entre os dois valores?", o:["Cerca de 4,3%","Três vezes maior","200%","96%"], c:0, x:"A diferença é de 4 pontos percentuais: (96 − 92) / 92 ≈ 4,3%. O eixo cortado em 90% faz a barra de 2025 (6 unidades acima do eixo) parecer três vezes a de 2024 (2 unidades)."},
+ {e:"Para comparar, no mesmo gráfico, a distribuição das notas de duas turmas diferentes, o mais indicado é:", o:["Dois gráficos de setores","Polígonos de frequências sobrepostos","Um gráfico de barras com as médias","Um gráfico de setores em 3D"], c:1, x:"As linhas dos polígonos se sobrepõem de forma legível e permitem comparar o formato das duas distribuições."}
+];
+var qi=0, ac=0, qz=document.getElementById("quiz");
+function renderQuiz(){
+  if(qi>=QUIZ.length){ estado.quizFeito=true; salvar(); atualizarProgresso();
+    qz.innerHTML='<div class="questao placar"><div class="grande">'+ac+'/'+QUIZ.length+'</div><p>'+(ac>=4?"Excelente! Você está pronto para a Lição 4.":"Vale revisar a lição e tentar de novo.")+'</p><button class="btn-enviar" id="quizDeNovo">REFAZER O QUIZ</button></div>';
+    document.getElementById("quizDeNovo").addEventListener("click", function(){qi=0;ac=0;renderQuiz();}); return; }
+  var q=QUIZ[qi], h='<div class="questao"><div class="quiz-topo"><span>Questão '+(qi+1)+' de '+QUIZ.length+'</span><span>Acertos: '+ac+'</span></div><div class="enunciado">'+q.e+'</div>';
+  q.o.forEach(function(t,i){ h+='<button class="opcao" data-i="'+i+'"><span class="radio"></span>'+t+'</button>'; });
+  qz.innerHTML=h+'<button class="btn-enviar" disabled>ENVIAR</button><div class="retorno"></div></div>';
+  var ops=qz.querySelectorAll(".opcao"), env=qz.querySelector(".btn-enviar"), ret=qz.querySelector(".retorno"), e=-1, r=false;
+  ops.forEach(function(o){ o.addEventListener("click", function(){ if(r) return; ops.forEach(function(x){x.classList.remove("sel");}); o.classList.add("sel"); e=+o.dataset.i; env.disabled=false; }); });
+  env.addEventListener("click", function(){ if(!r){ r=true; var ok=e===q.c; if(ok) ac++; ops[e].classList.add(ok?"certa":"errada"); if(!ok) ops[q.c].classList.add("certa"); ret.className="retorno "+(ok?"ok":"nao"); ret.innerHTML="<b>"+(ok?"Correto.":"Não foi dessa vez.")+"</b> "+q.x; env.textContent=qi===QUIZ.length-1?"VER RESULTADO":"PRÓXIMA"; } else { qi++; renderQuiz(); } });
+}
+renderQuiz();
+
+/* restaurar */
+if(estado.s>0){ secoes.forEach(function(s){ if(+s.dataset.s<=estado.s) s.classList.add("visivel"); }); document.querySelectorAll(".continuar").forEach(function(b){ if(+b.dataset.prox<=estado.s) b.parentNode.style.display="none"; }); }
+atualizarProgresso();
+})();
+</script>
+
+<div class="player" id="player" hidden>
+  <button class="pl-btn" id="plPausa" aria-label="Pausar">❚❚</button>
+  <button class="pl-btn parar" id="plParar" aria-label="Parar">■</button>
+  <div class="pl-info"><b>Introdução da aula</b><span id="plVoz"></span></div>
+  <label class="pl-vel">Velocidade<select id="plVel"><option value="0.85">0,85×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+</div>
+<script>
+/* Introdução em áudio: toca audio/PREFIXO-intro.mp3 (voz Francisca); se faltar, usa a voz do navegador. */
+(function(){
+"use strict";
+var PREFIXO=document.body.dataset.aula, synth=window.speechSynthesis||null, voz=null, ativo=false, pausado=false, audioEl=null, elAtivo=null;
+function escolherVoz(){ if(!synth) return; var pt=synth.getVoices().filter(function(v){return /^pt[-_]BR/i.test(v.lang);});
+  voz=pt.find(function(v){return /francisca/i.test(v.name);})||pt.find(function(v){return /natural|online|neural/i.test(v.name);})||pt.find(function(v){return /google/i.test(v.name);})||pt[0]||null; }
+if(synth){ escolherVoz(); if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=escolherVoz; }
+var player=document.getElementById("player"), plPausa=document.getElementById("plPausa"), vel=document.getElementById("plVel"), btn=document.getElementById("ouvirIntro"), rot=btn.textContent;
+var paragrafos=Array.prototype.slice.call(document.querySelectorAll("#introTexto .narra"));
+function destacar(el){ if(elAtivo) elAtivo.classList.remove("lendo"); elAtivo=el; if(el) el.classList.add("lendo"); }
+function parar(){ ativo=false; if(audioEl){audioEl.pause();audioEl=null;} if(synth) synth.cancel(); destacar(null); player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function fim(){ ativo=false; destacar(null); audioEl=null; player.hidden=true; btn.classList.remove("tocando"); btn.textContent=rot; }
+function mostrar(origem){ player.hidden=false; document.getElementById("plVoz").textContent=origem; plPausa.textContent="❚❚"; pausado=false; }
+function falar(){
+  var i=0, partes=[];
+  paragrafos.forEach(function(p,pi){ (p.textContent.replace(/\s+/g," ").trim().match(/[^.!?:;]+[.!?:;]*/g)||[]).forEach(function(t){ partes.push([pi,t.trim()]); }); });
+  (function prox(){
+    if(!ativo) return; if(i>=partes.length){ fim(); return; }
+    var pz=partes[i++]; destacar(paragrafos[pz[0]]);
+    var u=new SpeechSynthesisUtterance(pz[1]); u.lang="pt-BR"; if(voz) u.voice=voz; u.rate=+vel.value;
+    u.onend=prox; u.onerror=function(e){ if(e.error!=="interrupted"&&e.error!=="canceled") prox(); };
+    synth.speak(u);
+  })();
+}
+function tocar(){
+  parar(); ativo=true; btn.classList.add("tocando"); btn.textContent="■ Parar a introdução";
+  var a=new Audio(), decidido=false; audioEl=a; a.src="audio/"+PREFIXO+"-intro.mp3"; a.playbackRate=+vel.value;
+  a.onplaying=function(){ if(!decidido){ decidido=true; mostrar("Voz: Francisca (arquivo de áudio)"); } };
+  a.onended=fim;
+  a.onerror=function(){ if(decidido||!ativo) return; decidido=true; audioEl=null;
+    if(!synth){ mostrar("Este navegador não oferece narração por voz."); ativo=false; return; }
+    mostrar(voz?"Voz do navegador: "+voz.name:"Voz padrão do navegador"); falar(); };
+  var pr=a.play(); if(pr&&pr.catch) pr.catch(function(){ a.onerror(); });
+}
+btn.addEventListener("click", function(){ if(ativo) parar(); else tocar(); });
+plPausa.addEventListener("click", function(){
+  if(audioEl){ if(audioEl.paused){audioEl.play();plPausa.textContent="❚❚";} else {audioEl.pause();plPausa.textContent="▶";} return; }
+  if(!synth) return; if(pausado){synth.resume();pausado=false;plPausa.textContent="❚❚";} else {synth.pause();pausado=true;plPausa.textContent="▶";}
+});
+document.getElementById("plParar").addEventListener("click", parar);
+vel.addEventListener("change", function(){ if(audioEl) audioEl.playbackRate=+vel.value; });
+})();
+</script>
+<script>
+(function(){
+  var pct=document.getElementById("pct"), m=document.getElementById("tmPct"), bar=document.getElementById("tmBarra"),
+      lat=document.getElementById("lateral"), veu=document.getElementById("veu"), btn=document.getElementById("btnMenu");
+  function sinc(){ m.textContent=pct.textContent+"%"; bar.style.width=pct.textContent+"%"; }
+  new MutationObserver(sinc).observe(pct,{childList:true,characterData:true,subtree:true}); sinc();
+  function estado(){ var ab=lat.classList.contains("aberta"); veu.classList.toggle("on",ab); btn.textContent=ab?"✕ Fechar":"☰ Lições"; }
+  btn.addEventListener("click", function(){ setTimeout(estado,0); });
+  veu.addEventListener("click", function(){ lat.classList.remove("aberta"); estado(); });
+})();
+</script>
+</body>
+</html>
